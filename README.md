@@ -1,12 +1,35 @@
-## cdc [directory]
+# cdc [directory]
 I have a few directories in which I clone repositories. This function will
 change directory to the passed arguement, no matter which directory it's in,
 complete with tab-completion for its arguments.
 
 I chose to make this function rather than editing `$CDPATH` because I don't like
-changing the default bahavior of `cd`.
+changing the default bahavior of `cd`, but you could just as easily do the
+following:
 
-### Set-up
+```sh
+CDPATH=/path/to/repo:/path/to/other/repo
+```
+
+## Installation
+I wrote this function as an
+[oh-my-zsh](https://github.com/robbyrussell/oh-my-zsh) plugin, but it will work
+with vanilla `zsh`, or even `bash`.
+
+### oh-my-zsh
+Clone the repository in your `$ZSH_CUSTOM/plugins` directory
+```sh
+git clone https://github.com/evanthegrayt/cdc.git $ZSH_CUSTOM/plugins/cdc
+```
+Then add the plugin to your `$HOME/.zshrc` file in the `plugins` array:
+```sh
+plugins=(cdc) # Obviously, leave your other plugins in the array
+```
+
+### Vanilla zsh or bash
+TODO: Add installation instructions for non-oh-my-zsh platforms.
+
+## Set-up
 To use this feature, you need to either export `CDC_DIRS` as an environmental
 variable, or create a file called `$HOME/.cdcrc`, and create the array in that
 file. It should be an array with absolute paths to the directories to
@@ -26,7 +49,7 @@ environment, and some poeple don't like creating a lot of dotfiles in their home
 directory. I prefer to create the files, but feel free to choose the method you
 prefer.
 
-### Usage
+## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
 to change to that directory.
