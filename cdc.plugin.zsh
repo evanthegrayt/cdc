@@ -3,7 +3,7 @@
 
 cdc() {
 
-    [[ -e $HOME/.cdcrc ]] && source $HOME/.cdcrc
+    [[ -e $HOME/.cdcrc && -z $REPO_DIRS ]] && source $HOME/.cdcrc
 
     local dir
     local cd_dir="${1%%/*}"
@@ -13,8 +13,8 @@ cdc() {
         local subdir="${1#*/}"
     fi
 
-    if (( ${#REPO_DIRS[@]} == 0 )); then
-        print "You must either \`export REPO_DIRS=()\` as an environmental" >&2
+    if (( ${#CDC_DIRS[@]} == 0 )); then
+        print "You must either \`export CDC_DIRS=()\` as an environmental" >&2
         print "variable, or create a ~/.cdcrc file declaring the array!" >&2
         return 2
     elif (( $# != 1 )); then
@@ -22,7 +22,7 @@ cdc() {
         return 1
     fi
 
-    for dir in ${REPO_DIRS[@]}; do
+    for dir in ${CDC_DIRS[@]}; do
         if [[ -d $dir ]]; then
             if [[ -d $dir/$cd_dir ]]; then
                 cd "$dir/$cd_dir"
@@ -36,11 +36,11 @@ cdc() {
                 return 0
             fi
         else
-            print "[$dir] is exported in \$REPO_DIRS but is not a directory" >&2
+            print "[$dir] is exported in \$CDC_DIRS but is not a directory" >&2
         fi
     done
 
-    print "[$cd_dir] not found in ${REPO_DIRS[@]}" >&2
+    print "[$cd_dir] not found in ${CDC_DIRS[@]}" >&2
     return 2
 }
 

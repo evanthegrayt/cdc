@@ -3,9 +3,9 @@
 _cdc_repo_list() {
     local dir
 
-    [[ -e $HOME/.cdcrc ]] && source $HOME/.cdcrc
+    [[ -e $HOME/.cdcrc && -z $REPO_DIRS ]] && source $HOME/.cdcrc
 
-    for dir in ${REPO_DIRS[@]}; do
+    for dir in ${CDC_DIRS[@]}; do
         cd $dir
         ls -d */ | tr -d "/"
     done
