@@ -65,4 +65,6 @@ CDC_DIRS=($HOME/dir_with_repos)
 # and `dir_with_repos` has a subdirectory called `bin`, you can:
 cdc dir_with_repos/bin
 ```
+If the subdirectory doesn't exist, it will `cd` to the base directory, and then
+print a message to `stderr`.
 
