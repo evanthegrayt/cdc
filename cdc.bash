@@ -1,5 +1,9 @@
 # `cd` to my repos in my repo directories. I decided to do this, rather than
 # adding to $CDPATH, because I don't like changing the default `cd` behavior.
+if [[ -n $BASH_IT ]]; then
+    cite about-plugin
+    about-plugin 'easily `cd` to common repos from anywhere'
+fi
 
 cdc() {
 
