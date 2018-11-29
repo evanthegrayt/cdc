@@ -11,7 +11,7 @@ cdc() {
 
     local dir
     local cd_dir="${1%%/*}"
-    local USAGE="$0: [DIRECTORY]"
+    local USAGE="cdc: [DIRECTORY]"
 
     if [[ "$1" == */* ]]; then
         local subdir="${1#*/}"
