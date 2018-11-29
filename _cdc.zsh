@@ -3,7 +3,7 @@
 _cdc_repo_list() {
     local dir
 
-    [[ -e $HOME/.cdcrc && -z $REPO_DIRS ]] && source $HOME/.cdcrc
+    [[ -z $REPO_DIRS && -f $HOME/.cdcrc ]] && source $HOME/.cdcrc
 
     for dir in ${CDC_DIRS[@]}; do
         cd $dir
