@@ -28,8 +28,17 @@ Then add the plugin to your `$HOME/.zshrc` file in the `plugins` array:
 plugins=(cdc) # Obviously, leave your other plugins in the array
 ```
 
+### bash-it
+Clone the repository in your `$BASH_IT_CUSTOM` directory
+```sh
+git clone https://github.com/evanthegrayt/cdc.git $BASH_IT_CUSTOM/cdc
+```
+Files in this directory that end with `.bash` are automatically sourced, so
+there's nothing else to do.
+
 ### Vanilla zsh or bash
-TODO: Add installation instructions for non-`oh-my-zsh` platforms.
+Just source the `cdc.plugin.bash` file from one of your startup files, such as
+`~/.zshrc` or `~/.bashrc`
 
 ## Set-up
 To use this feature, you need to either export `CDC_DIRS` as an environmental
