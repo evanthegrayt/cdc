@@ -77,3 +77,8 @@ cdc dir_with_repos/bin
 If the subdirectory doesn't exist, it will `cd` to the base directory, and then
 print a message to `stderr`.
 
+## Reporting bugs
+This program is under development, so if you have an idea or find a bug, please
+[create an issue](https://github.com/evanthegrayt/cdc/issues/new). Just make
+sure the topic doesn't already exist.
+
