@@ -16,7 +16,8 @@ cd other_repo
 ## Installation
 I wrote this function as an
 [oh-my-zsh](https://github.com/robbyrussell/oh-my-zsh) plugin, but it will work
-with vanilla `zsh`, or even `bash`.
+with vanilla `zsh`, or even [bash-it](https://github.com/Bash-it/bash-it)
+or vanilla `bash`.
 
 ### oh-my-zsh
 Clone the repository in your `$ZSH_CUSTOM/plugins` directory
