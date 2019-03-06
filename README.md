@@ -58,11 +58,6 @@ export CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/repos)
 CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/repos)
 ```
 
-I chose to allow both methods because some people prefer not to pollute their
-environment, and some poeple don't like creating a lot of dotfiles in their home
-directory. I prefer to create the files, but feel free to choose the method you
-prefer.
-
 ## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
