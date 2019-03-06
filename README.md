@@ -1,7 +1,9 @@
 # cdc [directory]
 I have a few directories in which I clone repositories. This function will
 change directory to the passed arguement, no matter which directory it's in,
-complete with tab-completion for its arguments (if you're using `zsh`).
+complete with tab-completion for its arguments (although this currently only
+works if you're using `.oh-my-zsh`. There is an issue to update this when I have
+the time).
 
 I chose to make this function rather than editing `$CDPATH` because I don't like
 changing the default bahavior of `cd`, but you could just as easily do the
