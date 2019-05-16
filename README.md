@@ -40,22 +40,37 @@ Files in this directory that end with `.bash` are automatically sourced, so
 there's nothing else to do.
 
 ### Vanilla zsh or bash
-Just source the `cdc.plugin.bash` file from one of your startup files, such as
-`~/.zshrc` or `~/.bashrc`
+Just source either the `cdc.plugin.zsh` file for `zsh`, or `cdc.plugin.bash`
+file for `bash`, from one of your startup files, such as `~/.zshrc` or
+`~/.bashrc`.s
+
+If the argument completion doesn't work for `zsh`, try adding the
+directory to your `fpath` array.
+```sh
+fpath+=(/path/to/cdc)
+```
+If it still doesn't work, please add your pertinent config info to [this
+issue](https://github.com/evanthegrayt/cdc/issues/4) in a comment.
 
 ## Set-up
-To use this feature, you need to either export `CDC_DIRS` as an environmental
-variable, or create a file called `$HOME/.cdcrc`, and create the array in that
-file. It should be an array with absolute paths to the directories to
-search.
+To use this feature, you need to set `CDC_DIRS` in either a startup file (such
+as `~/.zshrc`), or a file called `$HOME/.cdcrc`. It should be an array with
+absolute paths to the directories to search.
 
 ```sh
-# ENVIRONMENTAL VARIABLE EXAMPLE; this line would go in .zshrc or some other
-# start-up config file
-export CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/repos)
-
-# RC FILE EXAMPLE; this line would go in `$HOME/.cdcrc`
+# Set this in either `~/.zshrc` (or similar), or in `~/.cdcrc`
 CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/repos)
+```
+
+If you have directories within `CDC_DIRS` that you want the plugin to ignore,
+such as a notes directory, you can also set `CDC_IGNORE` to an array, containing
+directories to ignore. These elements should only be the directory base-name,
+not the absolute path.
+
+```sh
+# Set this in either `~/.zshrc` (or similar), or in `~/.cdcrc`. Assuming you
+# never want to `cdc notes_directory`
+CDC_IGNORE=(notes_directory)
 ```
 
 ## Usage
