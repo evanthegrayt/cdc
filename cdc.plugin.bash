@@ -30,8 +30,11 @@ cdc() {
             echo "[$dir] is exported in \$CDC_DIRS but is not a directory" >&2
             continue
         fi
-        [[ -d $dir/$cd_dir ]] || continue
+
+        ([[ ! -d $dir/$cd_dir ]] || _cdc_is_excluded_dir "$cd_dir") && continue
+
         wdir="$dir/$cd_dir"
+
         if [[ -n $subdir ]]; then
             if [[ -d $wdir/$subdir ]]; then
                 wdir+="/$subdir"
@@ -39,11 +42,27 @@ cdc() {
                 echo "[$subdir] does not exist in [$cd_dir]." >&2
             fi
         fi
+
         cd "$wdir"
+
         return 0
     done
 
     echo "[$cd_dir] not found in ${CDC_DIRS[@]}" >&2
     return 2
+}
+
+_cdc_is_excluded_dir() {
+    local string="$1"
+
+    ([[ -z $CDC_IGNORE ]] || (( ${#CDC_IGNORE[@]} == 0 ))) && return 1
+
+    for element in "${CDC_IGNORE[@]}"; do
+        if [[ "${element/\//}" == "${string/\//}" ]]; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
