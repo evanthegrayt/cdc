@@ -9,9 +9,10 @@ changing the default behavior of `cd`, but you could just as easily do the
 following:
 
 ```sh
-CDPATH=/path/to/repo:/path/to/other_repo
+# Assuming `other_repo` exists in `/path/to/repo_dir`
+CDPATH=/path/to/repo_dir
 
-cd other_repo
+cd other_repo # will cd to /path/to/repo_dir/other_repo
 ```
 
 ## Installation
