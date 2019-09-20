@@ -15,6 +15,16 @@ CDPATH=/path/to/repo_dir
 cd other_repo # will cd to /path/to/repo_dir/other_repo
 ```
 
+Alternatively, you could make aliases:
+
+```sh
+alias other_repo='cd /path/to/repo_dir/other_repo'
+```
+
+I don't like this method either, as it just pollutes your environment. In my
+opinion, the less aliases, the better. Also, you now have to remember an alias
+for each repository. `cdc` solves this issue with its tab-completion.
+
 ## Installation
 ### oh-my-zsh
 Clone the repository in your `$ZSH_CUSTOM/plugins` directory
@@ -23,7 +33,7 @@ git clone https://github.com/evanthegrayt/cdc.git $ZSH_CUSTOM/plugins/cdc
 ```
 Then add the plugin to your `$HOME/.zshrc` file in the `plugins` array:
 ```sh
-plugins=(cdc) # Obviously, leave your other plugins in the array
+plugins=(cdc) # Obviously, leave your other plugins in the array.
 ```
 
 ### bash-it
