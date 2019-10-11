@@ -8,5 +8,5 @@ if [[ -n $BASH_IT ]]; then
     about-plugin '`cd` to directories from anywhere without chaning $CDPATH'
 fi
 
-complete -W "$( _cdc_repo_list )" cdc
+complete -o nospace -W "$( _cdc_repo_list )" cdc
 
