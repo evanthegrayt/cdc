@@ -85,6 +85,11 @@ showing up in auto-completion.
 CDC_IGNORE=(notes_directory)
 ```
 
+Note that the `~/.cdcrc` file is just a shell script that sets values, so you
+can use `bash` conditionals if you'd like to use the same config file on
+multiple systems. You can view an example of this in [my config
+file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/cdcrc).
+
 ## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
@@ -103,4 +108,10 @@ print a message to `stderr`.
 If you have an idea or find a bug, please [create an
 issue](https://github.com/evanthegrayt/cdc/issues/new). Just make sure the topic
 doesn't already exist.
+
+If you have an issue with tab-completion, make sure you have completion enabled
+for your shell
+([bash](https://www.gnu.org/software/bash/manual/html_node/Programmable-Completion.html)
+/ [zsh](http://zsh.sourceforge.net/Doc/Release/Completion-System.html)). If,
+after reading the manual, you still have problems, feel free to submit an issue.
 
