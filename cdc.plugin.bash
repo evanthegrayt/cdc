@@ -1,6 +1,6 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source $DIR/cdc.sh
-source $DIR/cdc_completion_functions.sh
+source $DIR/cdc_completion.sh
 unset DIR
 
 if [[ -n $BASH_IT ]]; then
