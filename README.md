@@ -104,3 +104,9 @@ If you have an idea or find a bug, please [create an
 issue](https://github.com/evanthegrayt/cdc/issues/new). Just make sure the topic
 doesn't already exist.
 
+If you have an issue with tab-completion, make sure you have completion enabled
+for your shell
+([bash](https://www.gnu.org/software/bash/manual/html_node/Programmable-Completion.html)
+/ [zsh](http://zsh.sourceforge.net/Doc/Release/Completion-System.html)). If,
+after reading the manual, you still have problems, feel free to submit an issue.
+
