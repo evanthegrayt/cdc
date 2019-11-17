@@ -12,7 +12,7 @@ unset DIR
 # Bash-it plugin citations.
 if [[ -n $BASH_IT ]]; then
     cite about-plugin
-    about-plugin '`cd` to directories from anywhere without chaning $CDPATH'
+    about-plugin '`cd` to directories from anywhere without changing $CDPATH'
 fi
 
 ##
