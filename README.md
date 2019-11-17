@@ -85,6 +85,11 @@ showing up in auto-completion.
 CDC_IGNORE=(notes_directory)
 ```
 
+Note that the `~/.cdcrc` file is just a shell script that sets values, so you
+can use `bash` conditionals if you'd like to use the same config file on
+multiple systems. You can view an example of this in [my config
+file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/cdcrc).
+
 ## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
