@@ -45,8 +45,9 @@ cdc() {
         # exist, print a message to stderr and move on to the next directory in
         # the array.
         if ! [[ -d $dir ]]; then
-            # TODO Make this message suppress-able. Issue #5.
-            echo "[$dir] is exported in \$CDC_DIRS but is not a directory" >&2
+            if ! $CDC_QUIET; then
+                echo "[$dir] is listed in \$CDC_DIRS but is not a directory" >&2
+            fi
             continue
         fi
 
@@ -69,7 +70,9 @@ cdc() {
             else
                 ##
                 # If it doesn't exist as a directory, print message to stderr.
-                echo "[$subdir] does not exist in [$cd_dir]." >&2
+                if ! $CDC_QUIET; then
+                    echo "[$subdir] does not exist in [$cd_dir]." >&2
+                fi
             fi
         fi
 

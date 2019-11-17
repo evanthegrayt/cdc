@@ -80,9 +80,15 @@ path. "Ignoring" a directory will prevent it from being `cdc`'d to, and from
 showing up in auto-completion.
 
 ```sh
-# Set this in either `~/.zshrc` (or similar), or in `~/.cdcrc`.
 # Assuming you never want to `cdc notes_directory`:
 CDC_IGNORE=(notes_directory)
+```
+
+You can suppress warning messages, such as when a directory doesn't exist, by
+setting the following:
+
+```sh
+CDC_QUIET=true
 ```
 
 Note that the `~/.cdcrc` file is just a shell script that sets values, so you

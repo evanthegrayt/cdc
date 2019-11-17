@@ -46,6 +46,9 @@ _cdc_repo_list() {
         ##
         # If the element isn't a directory that exists, move on.
         if ! [[ -d $dir ]]; then
+            if ! $CDC_QUIET; then
+                printf "\nWarning: $dir is not a valid directory." >&2
+            fi
             continue
         fi
 
