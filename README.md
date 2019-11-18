@@ -4,6 +4,17 @@ change directory to the passed argument, no matter which of the
 repository-containing directories it's in. Comes with tab-completion for its
 arguments, as long as your `zsh`/`bash` version supports it.
 
+### Table of contents
+- [Rationale](#rationale)
+- [Installation](#installation)
+  - [Oh-My-Zsh](#oh-my-zsh)
+  - [Bash-It](#bash-it)
+  - [Vanilla Zsh or Bash](#vanilla-zsh-or-bash)
+- [Set-up](#set-up)
+- [Usage](#usage)
+  - [Options](#options)
+- [Reporting Bugs](#reporting-bugs)
+
 ## Rationale
 I chose to make this function rather than editing `$CDPATH` because I don't like
 changing the default behavior of `cd`, but you could just as easily do the
@@ -73,6 +84,11 @@ absolute paths to the directories to search.
 CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/another_dir_with_repos)
 ```
 
+Note that the order of the elements in the array matters. The plugin will `cd`
+to the first match it finds, so if you have the same repository -- or two
+repositories with the same name -- in two places, the first location in the
+array will take precedence.
+
 If you have directories within `CDC_DIRS` that you want the plugin to ignore,
 you can also set `CDC_IGNORE` to an array containing directories to ignore.
 These elements should only be the directory base-name, **not** the absolute
@@ -109,6 +125,19 @@ cdc dir_with_repos/bin
 ```
 If the subdirectory doesn't exist, it will `cd` to the base directory, and then
 print a message to `stderr`.
+
+### Options
+The plugin comes with a few available options dealing with the directory history
+stack, similar to `pushd`, `popd`, and `dirs`. Be aware, only one option can be
+run at a time, and the first flag will take precedence.
+
+|Flag|What it does|
+|:------|:-----------|
+|-d|List directories in history stack. Similar to the `dirs` command.|
+|-c|`cd` to the root of current directory in the history stack.|
+|-l|`cd` to last directory. Similar to the `cd -` command. This also rearranges the histroy stack.|
+|-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
+|-h|Print help.|
 
 ## Reporting bugs
 If you have an idea or find a bug, please [create an
