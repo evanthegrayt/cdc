@@ -1,11 +1,7 @@
 # cdc [directory]
-I have a few directories in which I clone repositories. This function will
-change directory to the passed argument, no matter which of the
-repository-containing directories it's in. Comes with tab-completion for its
-arguments, as long as your `zsh`/`bash` version supports it.
-
-### Table of contents
+## Table of contents
 - [Rationale](#rationale)
+  - [Why the name "cdc"?](#why-the-name-cdc)
 - [Installation](#installation)
   - [Oh-My-Zsh](#oh-my-zsh)
   - [Bash-It](#bash-it)
@@ -16,6 +12,16 @@ arguments, as long as your `zsh`/`bash` version supports it.
 - [Reporting Bugs](#reporting-bugs)
 
 ## Rationale
+I have a few directories in which I clone repositories. This function will
+change directory to the passed argument, no matter which of the
+repository-containing directories it's in. The plugin comes with tab-completion
+for its arguments, as long as your `zsh`/`bash` version supports it. Also
+includes session history, and has options available that behave similar to the
+`pushd`, `popd`, and `dirs` commands.
+
+While this plugin was written for directories that contain `git` repositories,
+you can obviously use it for adding any directory to your `cd` path.
+
 I chose to make this function rather than editing `$CDPATH` because I don't like
 changing the default behavior of `cd`, but you could just as easily do the
 following:
@@ -35,6 +41,11 @@ alias other_repo='cd /path/to/repo_dir/other_repo'
 I don't like this method either, as it just pollutes your environment. In my
 opinion, the less aliases, the better. Also, you now have to remember an alias
 for each repository. `cdc` solves this issue with its tab-completion.
+
+### Why the name "cdc"?
+I wanted something fast to type that wasn't already a command or builtin. You
+already type `cd` a million times a day, and your finger is already on the
+<kbd>c</kbd> key. You can't get much faster.
 
 ## Installation
 ### oh-my-zsh
@@ -87,7 +98,9 @@ CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/another_dir_with_repos)
 Note that the order of the elements in the array matters. The plugin will `cd`
 to the first match it finds, so if you have the same repository -- or two
 repositories with the same name -- in two places, the first location in the
-array will take precedence.
+array will take precedence. There is currently an issue to better handle this...
+feature. Not sure how I want to go about it yet. Suggestions are very much
+welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
 
 If you have directories within `CDC_DIRS` that you want the plugin to ignore,
 you can also set `CDC_IGNORE` to an array containing directories to ignore.
