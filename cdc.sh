@@ -18,6 +18,7 @@ cdc() {
     local dir
     local wdir
     local cd_dir="${1%%/*}"
+    local OPTIND
 
     ##
     # NOTE: Experimental feature.
@@ -41,15 +42,15 @@ cdc() {
 
     ##
     # Case options if they're present.
-    while getopts "cdhlp" opts; do
-        case $opts in
+    while getopts "cdhlp" opt; do
+        case $opt in
 
             ##
             # cd to the root of the current repository in the stack.
             c)
                 ##
                 # If the stack is empty, tell the user and return.
-                if (( ${#CDC_HISTORY} == 0 )); then
+                if (( ${#CDC_HISTORY[@]} == 0 )); then
                     echo "Stack is empty." >&2
                     return 1
                 fi
@@ -63,8 +64,9 @@ cdc() {
 
             ##
             # cd to the last repo, but don't add it to the stack.
-            # HACK This reeks of code-smell, but arrays are awful in shell
-            # scripts. If you can think of a better way, please let me know.
+            # HACK: This reeks of code-smell, but arrays are awful in shell
+            # scripts. If you can think of a better way to accomplish this,
+            # please let me know.
             l)
 
                 local cdc_last_element
@@ -73,7 +75,7 @@ cdc() {
                 ##
                 # If the stack doesn't at least two elements, tell the user and
                 # return.
-                if (( ${#CDC_HISTORY} < 2 )); then
+                if (( ${#CDC_HISTORY[@]} < 2 )); then
                     echo "Not enough directories in the stack." >&2
                     return 1
                 fi
@@ -82,14 +84,10 @@ cdc() {
                 cdc_next_to_last_element=${CDC_HISTORY[-2]}
 
                 ##
-                # Unset the last element of the array.
-                if [[ -n $BASH_VERSION ]]; then
-                    unset 'CDC_HISTORY[${#CDC_HISTORY[@]}-1]'
-                    unset 'CDC_HISTORY[${#CDC_HISTORY[@]}-2]'
-                else # zsh
-                    unset 'CDC_HISTORY[${#CDC_HISTORY[@]}]'
-                    unset 'CDC_HISTORY[${#CDC_HISTORY[@]}-1]'
-                fi
+                # Unset the last elements of the array.
+                unset 'CDC_HISTORY[-1]'
+                CDC_HISTORY=(${CDC_HISTORY[@]})
+                unset 'CDC_HISTORY[-1]'
 
                 CDC_HISTORY=(
                     ${CDC_HISTORY[@]}
@@ -109,13 +107,13 @@ cdc() {
 
                 ##
                 # If the stack is empty, tell the user and return.
-                if (( ${#CDC_HISTORY} == 0 )); then
+                if (( ${#CDC_HISTORY[@]} == 0 )); then
                     echo "Stack is empty."
                 else
                     ##
                     # Print the array.
                     # echo ${CDC_HISTORY[@]}
-                    for cdc_history in $CDC_HISTORY; do
+                    for cdc_history in ${CDC_HISTORY[@]}; do
                         printf "${cdc_history##*/} "
                     done
                     echo
@@ -129,27 +127,21 @@ cdc() {
             p)
                 ##
                 # If the stack is empty, tell the user and return.
-                if (( ${#CDC_HISTORY} == 0 )); then
+                if (( ${#CDC_HISTORY[@]} == 0 )); then
                     echo "Stack is empty." >&2
                     return 1
-                elif (( ${#CDC_HISTORY} == 1 )); then
+                elif (( ${#CDC_HISTORY[@]} == 1 )); then
                     echo "At beginning of stack." >&2
                     return 1
                 fi
 
-                ##
-                # Unset the last element of the array.
-                if [[ -n $BASH_VERSION ]]; then
-                    unset 'CDC_HISTORY[${#CDC_HISTORY[@]}-1]'
-                else # zsh
-                    unset 'CDC_HISTORY[${#CDC_HISTORY[@]}]'
-                fi
+                unset 'CDC_HISTORY[-1]'
 
                 ##
                 # HACK: When you unset an element in an array, it still exists;
                 # it's just null, so you have to re-declare the array. If
                 # anyone knows a better way, please let me know.
-                CDC_HISTORY=($CDC_HISTORY)
+                CDC_HISTORY=(${CDC_HISTORY[@]})
 
                 ##
                 # cd to the previous diretory in the stack.
@@ -177,7 +169,7 @@ cdc() {
         # the array.
         if ! [[ -d $dir ]]; then
             if ! $CDC_QUIET; then
-                echo "[$dir] is listed in \$CDC_DIRS but is not a directory" >&2
+                printf "Warning: $dir is not a valid directory.\n" >&2
             fi
             continue
         fi
@@ -193,7 +185,7 @@ cdc() {
 
         ##
         # Add the directory to the history array.
-        if (( ${#CDC_HISTORY} > 0 )); then
+        if (( ${#CDC_HISTORY[@]} > 0 )); then
             OLD_CDC_DIR=${CDC_HISTORY[-1]}
         fi
         CDC_HISTORY+=("$wdir")

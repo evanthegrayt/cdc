@@ -15,7 +15,7 @@
 I have a few directories in which I clone repositories. This function will
 change directory to the passed argument, no matter which of the
 repository-containing directories it's in. The plugin comes with tab-completion
-for its arguments, as long as your `zsh`/`bash` version supports it. Also
+for its arguments, as long as your `zsh`/`bash` version supports it. It also
 includes session history, and has options available that behave similar to the
 `pushd`, `popd`, and `dirs` commands.
 
@@ -44,8 +44,8 @@ for each repository. `cdc` solves this issue with its tab-completion.
 
 ### Why the name "cdc"?
 I wanted something fast to type that wasn't already a command or builtin. You
-already type `cd` a million times a day, and your finger is already on the
-<kbd>c</kbd> key. You can't get much faster.
+already type `cd` a million times a day, and you don't even have to move your
+finger to hit the <kbd>c</kbd> key again. You can't get much faster.
 
 ## Installation
 ### oh-my-zsh
@@ -86,9 +86,9 @@ source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
 ```
 
 ## Set-up
-To use this feature, you need to set `CDC_DIRS` in either a startup file (such
-as `~/.zshrc`), or a file called `~/.cdcrc`. It should be an array with
-absolute paths to the directories to search.
+To use this plugin, you need to set `CDC_DIRS` in either a startup file (such as
+`~/.zshrc`), or a file called `~/.cdcrc`. It should be an array with absolute
+paths to the directories to search.
 
 ```sh
 # Set this in either `~/.zshrc` (or similar), or in `~/.cdcrc`
@@ -147,15 +147,20 @@ run at a time, and the first flag will take precedence.
 |Flag|What it does|
 |:------|:-----------|
 |-d|List directories in history stack. Similar to the `dirs` command.|
-|-c|`cd` to the root of current directory in the history stack.|
-|-l|`cd` to last directory. Similar to the `cd -` command. This also rearranges the histroy stack.|
+|-c|`cd` to the current directory in the history stack.|
+|-l|`cd` to last directory. Similar to the `cd -` command. This also rearranges the history stack.|
 |-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
 |-h|Print help.|
+
+There is no option to push to the stack, as this is done automatically with each
+`cdc` call. If you want that behavior, consider just using the actual `pushd`
+and `popd` commands. If you *really* want this behavior, let me know by
+[creating an issue](https://github.com/evanthegrayt/cdc/issues/new).
 
 ## Reporting bugs
 If you have an idea or find a bug, please [create an
 issue](https://github.com/evanthegrayt/cdc/issues/new). Just make sure the topic
-doesn't already exist.
+doesn't already exist. Better yet, you can always submit a Pull Request.
 
 If you have an issue with tab-completion, make sure you have completion enabled
 for your shell
