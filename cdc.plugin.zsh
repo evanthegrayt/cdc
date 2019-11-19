@@ -9,7 +9,7 @@ source "${0:h}/cdc_completion.sh"
 ##
 # Add completion arguments.
 _cdc() {
-    _arguments "1: :($( _cdc_repo_list ))"
+    _arguments "1: :($( __cdc_repo_list ))"
 }
 
 ##
