@@ -23,7 +23,6 @@ cdc() {
     local dir
     local wdir
     local cd_dir="${1%%/*}"
-    local OPTIND
 
     ##
     # In an interactive bash shell, you have to reset OPTIND each time, or
