@@ -15,15 +15,16 @@
 I have a few directories in which I clone repositories. This function will
 change directory to the passed argument, no matter which of the
 repository-containing directories it's in. The plugin comes with tab-completion
-for its arguments, as long as your `zsh`/`bash` version supports it. Also
-includes session history, and has options available that behave similar to the
-`pushd`, `popd`, and `dirs` commands.
+for its arguments, as long as your `zsh`/`bash` version supports it. The plugin
+also includes session history, and has options available that behave similar to
+the `popd` and `dirs` commands.
 
 While this plugin was written for directories that contain `git` repositories,
 you can obviously use it for adding any directory to your `cd` path.
 
-I chose to make this function rather than editing `$CDPATH` because I don't like
-changing the default behavior of `cd`, but you could just as easily do the
+It's worth noting that I chose to make this function rather than editing
+`$CDPATH` because I don't like changing the default behavior of `cd`, but you
+could just as easily do the
 following:
 ```sh
 # Assuming `other_repo` exists in `/path/to/repo_dir`
@@ -130,9 +131,9 @@ Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
 to change to that directory.
 
-You *can* append subdirectories, and it will work; however, I don't have
-tab-autocompletion working for this yet (any help with that would be
-appreciated). For example:
+You *can* append subdirectories, and it will work; however, this is an
+experimental feature, and I don't have tab-autocompletion working for this yet
+(any help with that would be appreciated). For example:
 ```sh
 cdc dir_with_repos/bin
 ```
