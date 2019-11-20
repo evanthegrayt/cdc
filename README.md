@@ -9,6 +9,7 @@
 - [Set-up](#set-up)
   - [Telling cdc where to look](#telling-cdc-where-to-look)
   - [Ignoring certain directories](#ignoring-certain-directories)
+  - [Automatically pushing to the history stack](#automatically-pushing-to-the-history-stack)
 - [Usage](#usage)
   - [Options](#options)
 - [Reporting Bugs](#reporting-bugs)
@@ -130,9 +131,11 @@ CDC_IGNORE=(notes_directory)
 
 ### Automatically pushing to the history stack
 By default, every `cdc` call will push the directory onto the history stack. You
-can disable this feature by setting `CDC_AUTO_PUSH` in your `~/.cdcrc`.
+can disable this feature by setting `CDC_AUTO_PUSH` to `false` in your
+`~/.cdcrc`.
 
 ```sh
+# Disable auto-pushing to history stack.
 CDC_AUTO_PUSH=false
 ```
 
