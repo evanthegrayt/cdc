@@ -7,6 +7,8 @@
   - [Bash-It](#bash-it)
   - [Vanilla Zsh or Bash](#vanilla-zsh-or-bash)
 - [Set-up](#set-up)
+  - [Telling cdc where to look](#telling-cdc-where-to-look)
+  - [Ignoring certain directories](#ignoring-certain-directories)
 - [Usage](#usage)
   - [Options](#options)
 - [Reporting Bugs](#reporting-bugs)
@@ -87,12 +89,24 @@ source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
 ```
 
 ## Set-up
-To use this plugin, you need to set `CDC_DIRS` in either a startup file (such as
-`~/.zshrc`), or a file called `~/.cdcrc`. It should be an array with absolute
-paths to the directories to search.
+The following settings require variables to be set from either a file called
+`~/.cdcrc`, or a shell startup file such as `~/.zshrc` or `~/.bash_profile`. The
+following instructions will default to using `~/.cdcrc`, but just know that you
+have the other option.
+
+Note that the `~/.cdcrc` file is just a shell script that sets values, so you
+can use `bash` conditionals if you'd like to use the same config file on
+multiple systems. You can view an example of this in [my config
+file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/cdcrc). Just
+remember, these files get sourced into your interactive shell on startup, so
+only use it to set the following values.
+
+### Telling cdc where to look
+To use this plugin, you need to set `CDC_DIRS` in `~/.cdcrc`. It should be an
+array with absolute paths to the directories to search.
 
 ```sh
-# Set this in either `~/.zshrc` (or similar), or in `~/.cdcrc`
+# Set this in ~/.cdcrc
 CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/another_dir_with_repos)
 ```
 
@@ -103,28 +117,16 @@ array will take precedence. There is currently an issue to better handle this...
 feature. Not sure how I want to go about it yet. Suggestions are very much
 welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
 
+### Ignoring certain directories
 If you have directories within `CDC_DIRS` that you want the plugin to ignore,
-you can also set `CDC_IGNORE` to an array containing directories to ignore.
-These elements should only be the directory base-name, **not** the absolute
-path. "Ignoring" a directory will prevent it from being `cdc`'d to, and from
-showing up in auto-completion.
+you can set `CDC_IGNORE` to an array containing those directories. These
+elements should only be the directory base-name, **not** the absolute path.
+"Ignoring" a directory will prevent it from being "seen" by `cdc`.
 
 ```sh
 # Assuming you never want to `cdc notes_directory`:
 CDC_IGNORE=(notes_directory)
 ```
-
-You can suppress warning messages, such as when a directory doesn't exist, by
-setting the following:
-
-```sh
-CDC_QUIET=true
-```
-
-Note that the `~/.cdcrc` file is just a shell script that sets values, so you
-can use `bash` conditionals if you'd like to use the same config file on
-multiple systems. You can view an example of this in [my config
-file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/cdcrc).
 
 ## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
@@ -133,10 +135,13 @@ to change to that directory.
 
 You *can* append subdirectories, and it will work; however, this is an
 experimental feature, and I don't have tab-autocompletion working for this yet
-(any help with that would be appreciated). For example:
+(any help with [the issue](https://github.com/evanthegrayt/cdc/issues/2) would
+be greatly appreciated). For example:
+
 ```sh
 cdc dir_with_repos/bin
 ```
+
 If the subdirectory doesn't exist, it will `cd` to the base directory, and then
 print a message to `stderr`.
 
@@ -147,13 +152,13 @@ debug mode.
 
 |Flag|What it does|
 |:------|:-----------|
-|-l|List all directories that you can `cdc` to. Same as tab-completion|
-|-d|List directories in history stack. Similar to the `dirs` command|
-|-c|`cd` to the current directory in the history stack|
-|-t|Toggle to the last directory, similar to `cd -`. Rearranges the history stack|
-|-p|`cd` to previous directory in history stack. Similar to the `popd` command|
-|-D|Debug mode. Enables warnings for when things aren't working as expected|
-|-h|Print help|
+|-l|List all directories that you can `cdc` to. Same as tab-completion.|
+|-d|List directories in history stack. Similar to the `dirs` command.|
+|-c|`cd` to the current directory in the history stack.|
+|-t|Toggle to the last directory, similar to `cd -`. Rearranges history stack.|
+|-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
+|-D|Debug mode. Enables warnings for when things aren't working as expected.|
+|-h|Print help.|
 
 There is no option to push to the stack, as this is done automatically with each
 `cdc` call. If you want that behavior, consider just using the actual `pushd`
