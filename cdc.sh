@@ -22,7 +22,8 @@ cdc() {
     # Set local vars to avoid environment pollution.
     local dir
     local wdir
-    local cd_dir="${1%%/*}"
+    local debug=false
+    local did_cd=false
 
     ##
     # In an interactive bash shell, you have to reset OPTIND each time, or
@@ -41,19 +42,13 @@ cdc() {
     # Check for the existence of required variables that should be set in
     # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
     if (( ${#CDC_DIRS[@]} == 0 )); then
-        echo 'You must set `CDC_DIRS` in your configuration file!'  >&2
+        echo 'You must set CDC_DIRS in a configuration file! See README.md.' >&2
         return 2
-    ##
-    # Print usage and exit if the wrong number of arguments are passed.
-    elif (( $# != 1 )); then
-        echo 'USAGE: cdc [DIRECTORY]' >&2
-        echo '  Use `-h` for more help' >&2
-        return 1
     fi
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'cdhlp' opt 2>/dev/null; do
+    while getopts 'Ddcdhlpt' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -70,16 +65,36 @@ cdc() {
                 # cd to the root of the last repository in the history.
                 cd ${CDC_HISTORY[-1]}
 
+                did_cd=true
+                ;;
+
+            ##
+            # -l: List the directories that are cdc-able.
+            l)
+                ##
+                # Get the list of directories.
+                local list=($( __cdc_repo_list $debug ))
+                local directory
+
+                ##
+                # Print the list and pipe to column for nice output. Also pad
+                # each element to make them all at least 8 characters long.
+                # This is done because column has issues printing strings less
+                # than 8 bytes.
+                for directory in "${list[@]}"; do
+                    printf "%-8s\n" "${directory}"
+                done | column
+
                 return 0
                 ;;
 
             ##
-            # -l: cd to the last repo, but don't add it to the stack.
+            # -t: cd to the last repo, but don't add it to the stack.
             # HACK: This reeks of code-smell, but arrays are awful in shell
             # scripts. If you can think of a better way to accomplish this,
             # please let me know. Just remember, it needs to be compatible with
             # both bash and zsh.
-            l)
+            t)
                 local cdc_last_element
                 local cdc_next_to_last_element
 
@@ -111,7 +126,7 @@ cdc() {
                 # Finally, cd to the last directory in the stack.
                 cd ${CDC_HISTORY[-1]}
 
-                return 0
+                did_cd=true
                 ;;
 
             ##
@@ -133,7 +148,7 @@ cdc() {
                     echo
                 fi
 
-                return 0
+                did_cd=true
                 ;;
 
             ##
@@ -160,20 +175,27 @@ cdc() {
                 # cd to the previous diretory in the stack.
                 cd ${CDC_HISTORY[-1]}
 
-                return 0
+                did_cd=true
                 ;;
 
             ##
             # -h: Print the help.
             h)
                 echo 'USAGE: cdc [DIRECTORY]'
-                echo '  -d | List the directories in stack'
-                echo '  -c | `cd` to the current directory in the stack'
-                echo '  -p | `cd` to previous directory and pop from the stack.'
-                echo '  -l | Toggle between the last two directories in the stack'
-                echo '  -h | Print this help'
+                echo '-l | List all directories that are cdc-able.'
+                echo '-d | List the directories in stack'
+                echo '-c | `cd` to the current directory in the stack'
+                echo '-p | `cd` to previous directory and pop from the stack.'
+                echo '-t | Toggle between the last two directories in the stack'
+                echo '-h | Print this help'
 
                 return 0
+                ;;
+
+            ##
+            # -D: Debug
+            D)
+                debug=true
                 ;;
 
             ##
@@ -185,6 +207,24 @@ cdc() {
         esac
     done
 
+    if $did_cd; then
+        return 0
+    fi
+
+    ##
+    # Shift out $OPTIND so we can accurately determine how many parameters (not
+    # options) were passed. Then, set cd_dir to $1.
+    shift $(( OPTIND - 1 ))
+    local cd_dir="${1%%/*}"
+
+    ##
+    # Print usage and exit if the wrong number of arguments are passed.
+    if (( $# != 1 )); then
+        echo 'USAGE: cdc [DIRECTORY]' >&2
+        echo '  Use `-h` for more help' >&2
+        return 1
+    fi
+
     ##
     # Loop through every element in $CDC_DIRS.
     for dir in ${CDC_DIRS[@]}; do
@@ -193,8 +233,8 @@ cdc() {
         # exist, print a message to stderr and move on to the next directory in
         # the array.
         if ! [[ -d $dir ]]; then
-            if ! $CDC_QUIET; then
-                echo "Warning: $dir is not a valid directory." >&2
+            if $debug; then
+                echo "DEBUG: $dir is not a valid directory." >&2
             fi
             continue
         fi
@@ -224,8 +264,8 @@ cdc() {
             else
                 ##
                 # If it doesn't exist as a directory, print message to stderr.
-                if ! $CDC_QUIET; then
-                    echo "[$subdir] does not exist in [$cd_dir]." >&2
+                if $debug; then
+                    echo "DEBUG: [$subdir] does not exist in [$cd_dir]." >&2
                 fi
             fi
         fi
@@ -274,3 +314,52 @@ __cdc_is_excluded_dir() {
     return 1
 }
 
+##
+# Completion function for the cdc plugin that lists repositories found in
+# $CDC_DIRS that aren't excluded.
+#
+# @param string $string
+# @return array
+__cdc_repo_list() {
+    local dir
+    local subdir
+    local directories=()
+    local debug=${1:-false}
+
+    ##
+    # Loop through all elements of $CDC_DIRS array.
+    for dir in "${CDC_DIRS[@]}"; do
+
+        ##
+        # If the element isn't a directory that exists, move on.
+        if ! [[ -d $dir ]]; then
+            if $debug; then
+                echo "DEBUG: $dir is not a valid directory." >&2
+            fi
+            continue
+        fi
+
+        ##
+        # Loop through all subdirectories in the directory.
+        for subdir in "$dir"/*/; do
+
+            ##
+            # Remove trailing slash from directory.
+            subdir=${subdir%?}
+
+            ##
+            # Remove preceding directories from subdir.
+            subdir=${subdir##*/}
+
+            ##
+            # If the directory isn't excluded, add it to the array.
+            if ! __cdc_is_excluded_dir "$subdir"; then
+                directories+=("$subdir")
+            fi
+        done
+    done
+
+    ##
+    # "Return" the array.
+    echo "${directories[@]}"
+}

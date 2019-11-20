@@ -5,7 +5,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ##
 # Source the plugin and completion functions.
 source $DIR/cdc.sh
-source $DIR/cdc_completion.sh
 unset DIR
 
 ##
