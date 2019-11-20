@@ -187,6 +187,7 @@ cdc() {
                 echo '-c | `cd` to the current directory in the stack'
                 echo '-p | `cd` to previous directory and pop from the stack.'
                 echo '-t | Toggle between the last two directories in the stack'
+                echo "-D | Debug mode for when things aren't working properly"
                 echo '-h | Print this help'
 
                 return 0
