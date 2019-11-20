@@ -141,17 +141,19 @@ If the subdirectory doesn't exist, it will `cd` to the base directory, and then
 print a message to `stderr`.
 
 ### Options
-The plugin comes with a few available options dealing with the directory history
-stack, similar to `pushd`, `popd`, and `dirs`. Be aware, only one option can be
-run at a time, and the first flag will take precedence.
+The plugin comes with a few available options. Most are for dealing with the
+directory history stack, similar to `pushd`, `popd`, and `dirs`. There's also a
+debug mode.
 
 |Flag|What it does|
 |:------|:-----------|
-|-d|List directories in history stack. Similar to the `dirs` command.|
-|-c|`cd` to the current directory in the history stack.|
-|-l|`cd` to last directory. Similar to the `cd -` command. This also rearranges the history stack.|
-|-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
-|-h|Print help.|
+|-l|List all directories that you can `cdc` to. Same as tab-completion|
+|-d|List directories in history stack. Similar to the `dirs` command|
+|-c|`cd` to the current directory in the history stack|
+|-t|Toggle to the last directory, similar to `cd -`. Rearranges the history stack|
+|-p|`cd` to previous directory in history stack. Similar to the `popd` command|
+|-D|Debug mode. Enables warnings for when things aren't working as expected|
+|-h|Print help|
 
 There is no option to push to the stack, as this is done automatically with each
 `cdc` call. If you want that behavior, consider just using the actual `pushd`

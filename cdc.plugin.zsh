@@ -4,7 +4,6 @@
 ##
 # Source the plugin and completion functions.
 source "${0:h}/cdc.sh"
-source "${0:h}/cdc_completion.sh"
 
 ##
 # Add completion arguments.
