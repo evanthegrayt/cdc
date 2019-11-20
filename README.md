@@ -128,6 +128,18 @@ elements should only be the directory base-name, **not** the absolute path.
 CDC_IGNORE=(notes_directory)
 ```
 
+### Automatically pushing to the history stack
+By default, every `cdc` call will push the directory onto the history stack. You
+can disable this feature by setting `CDC_AUTO_PUSH` in your `~/.cdcrc`.
+
+```sh
+CDC_AUTO_PUSH=false
+```
+
+You can then manually push directories onto the stack with `-u`. If you have
+`CDC_AUTO_PUSH` set to `true`, you can still `cdc` to a directory and not push
+it to the stack with the `-n` option. See [options](#options) below.
+
 ## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
@@ -157,6 +169,8 @@ debug mode.
 |-c|`cd` to the current directory in the history stack.|
 |-t|Toggle to the last directory, similar to `cd -`. Rearranges history stack.|
 |-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
+|-u|Push the directory onto the stack when `CDC_AUTO_PUSH=false`.|
+|-n|Do not push the directory onto the stack when `CDC_AUTO_PUSH=true`.|
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
 |-h|Print help.|
 

@@ -26,6 +26,11 @@ cdc() {
     local did_cd=false
 
     ##
+    # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
+    # in a startup file, and manually push with `-u`.
+    local pushdir=${CDC_AUTO_PUSH:-true}
+
+    ##
     # In an interactive bash shell, you have to reset OPTIND each time, or
     # getopts only works the first time you use them for a function call.
     local OPTIND
@@ -42,13 +47,13 @@ cdc() {
     # Check for the existence of required variables that should be set in
     # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
     if (( ${#CDC_DIRS[@]} == 0 )); then
-        echo 'You must set CDC_DIRS in a configuration file! See README.md.' >&2
+        echo 'You must set CDC_DIRS in a configuration file. See README.md.' >&2
         return 2
     fi
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'Ddcdhlpt' opt 2>/dev/null; do
+    while getopts 'Ddcdhlptun' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -139,6 +144,7 @@ cdc() {
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
                     echo 'Stack is empty.'
                 else
+
                     ##
                     # Print the array.
                     # echo ${CDC_HISTORY[@]}
@@ -154,6 +160,7 @@ cdc() {
             ##
             # -p: cd to the last element in the stack and pop it from the array.
             p)
+
                 ##
                 # If the stack is empty, tell the user and return.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
@@ -176,6 +183,18 @@ cdc() {
                 cd ${CDC_HISTORY[-1]}
 
                 did_cd=true
+                ;;
+
+            ##
+            # -u: Push the directory onto the history stack.
+            u)
+                pushdir=true
+                ;;
+
+            ##
+            # -n: Do not push the directory onto the history stack.
+            n)
+                pushdir=false
                 ;;
 
             ##
@@ -229,6 +248,7 @@ cdc() {
     ##
     # Loop through every element in $CDC_DIRS.
     for dir in ${CDC_DIRS[@]}; do
+
         ##
         # If a directory is in the $CDC_DIRS array, but the directory doesn't
         # exist, print a message to stderr and move on to the next directory in
@@ -253,16 +273,20 @@ cdc() {
 
         ##
         # Add the directory to the history array.
-        CDC_HISTORY+=("$wdir")
+        if $pushdir; then
+            CDC_HISTORY+=("$wdir")
+        fi
 
         ##
         # If the user passed a subdirectory (if the argument had a slash in it).
         if [[ -n $subdir ]]; then
+
             ##
             # If it exists as a directory, append it to the path.
             if [[ -d $wdir/$subdir ]]; then
                 wdir+="/$subdir"
             else
+
                 ##
                 # If it doesn't exist as a directory, print message to stderr.
                 if $debug; then
@@ -302,6 +326,7 @@ __cdc_is_excluded_dir() {
     ##
     # Loop through each element of $CDC_IGNORE array.
     for element in "${CDC_IGNORE[@]}"; do
+
         ##
         # If the element matches the passed string, return "true" to indicate
         # it's excluded.
