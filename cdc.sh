@@ -9,6 +9,10 @@ fi
 CDC_HISTORY=()
 
 ##
+# The default files and directories that mark the root of a repository.
+CDC_REPO_MARKERS+=(.git .git/ Rakefile Makefile .hg/ .bzr/ .svn/)
+
+##
 # The actual function that the user calls from the command line.
 # NOTE: I know this function is huge, and I hate it, but since this gets
 # sourced into interactive shells, I try to pollute the users' environments
@@ -22,6 +26,7 @@ cdc() {
     # Set local vars to avoid environment pollution.
     local dir
     local wdir
+    local marker
     local debug=false
     local did_cd=false
 
@@ -29,6 +34,7 @@ cdc() {
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
     # in a startup file, and manually push with `-u`.
     local pushdir=${CDC_AUTO_PUSH:-true}
+    local repos_only=${CDC_REPOS_ONLY:-false}
 
     ##
     # In an interactive bash shell, you have to reset OPTIND each time, or
@@ -53,7 +59,7 @@ cdc() {
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'Ddcdhlptun' opt 2>/dev/null; do
+    while getopts 'DdcdhlrRptuU' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -186,14 +192,26 @@ cdc() {
                 ;;
 
             ##
+            # -r: Force cdc to only cd to repositories.
+            r)
+                repos_only=true
+                ;;
+
+            ##
+            # -R: Force cdc to NOT only cd to repositories.
+            R)
+                repos_only=false
+                ;;
+
+            ##
             # -u: Push the directory onto the history stack.
             u)
                 pushdir=true
                 ;;
 
             ##
-            # -n: Do not push the directory onto the history stack.
-            n)
+            # -U: Do not push the directory onto the history stack.
+            U)
                 pushdir=false
                 ;;
 
@@ -264,6 +282,13 @@ cdc() {
         # If the element is not a directory, or is excluded, move on.
         if ([[ ! -d $dir/$cd_dir ]] || __cdc_is_excluded_dir "$cd_dir"); then
             continue
+        elif $repos_only; then
+            if ! __cdc_is_repo_dir; then
+                if $debug; then
+                    echo "DEBUG: Match was found but it was not a repository."
+                fi
+                continue
+            fi
         fi
 
         ##
@@ -377,6 +402,10 @@ __cdc_repo_list() {
             # Remove preceding directories from subdir.
             subdir=${subdir##*/}
 
+            if $CDC_REPOS_ONLY && ! __cdc_is_repo_dir; then
+                continue
+            fi
+
             ##
             # If the directory isn't excluded, add it to the array.
             if ! __cdc_is_excluded_dir "$subdir"; then
@@ -388,4 +417,18 @@ __cdc_repo_list() {
     ##
     # "Return" the array.
     echo "${directories[@]}"
+}
+
+__cdc_is_repo_dir() {
+    local is_repo=1
+
+    for marker in ${CDC_REPO_MARKERS[@]}; do
+        if [[ $marker == */ && -d $dir/$cd_dir/$marker ]] || \
+            [[ $marker != */ && -f $dir/$cd_dir/$marker ]]; then
+                is_repo=0
+                break
+        fi
+    done
+
+    return $is_repo
 }

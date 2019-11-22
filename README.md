@@ -9,6 +9,7 @@
 - [Set-up](#set-up)
   - [Telling cdc where to look](#telling-cdc-where-to-look)
   - [Ignoring certain directories](#ignoring-certain-directories)
+  - [Only recognize actual repositories](#only-recognize-actual-repositories)
   - [Automatically pushing to the history stack](#automatically-pushing-to-the-history-stack)
 - [Usage](#usage)
   - [Options](#options)
@@ -129,6 +130,19 @@ elements should only be the directory base-name, **not** the absolute path.
 CDC_IGNORE=(notes_directory)
 ```
 
+### Only recognize actual repositories
+You can set `CDC_REPOS_ONLY` in `~/.cdcrc` to make `cdc` only recognize
+repositories as directories. This is **disable by default**. You can also set
+an array of files and directories that mark what you consider a repository.
+
+```sh
+# Enable "repos-only" mode. Note, the default is false.
+CDC_REPOS_ONLY=true
+# Set repository markers with the following. Note, the following is already the
+# default, but this is how you can add more in ~/.cdcrc
+CDC_REPO_MARKERS=(.git .git/ Rakefile Makefile .hg/ .bzr/ .svn/)
+```
+
 ### Automatically pushing to the history stack
 By default, every `cdc` call will push the directory onto the history stack. You
 can disable this feature by setting `CDC_AUTO_PUSH` to `false` in your
@@ -173,7 +187,9 @@ debug mode.
 |-t|Toggle to the last directory, similar to `cd -`. Rearranges history stack.|
 |-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
 |-u|Push the directory onto the stack when `CDC_AUTO_PUSH=false`.|
-|-n|Do not push the directory onto the stack when `CDC_AUTO_PUSH=true`.|
+|-U|Do *not* push the directory onto the stack when `CDC_AUTO_PUSH=true`.|
+|-r|Only `cdc` to repositories. Overrides `$CDC_REPOS_ONLY`|
+|-R|`cd` to any directory, even it's not a repository. Overrides `$CDC_REPOS_ONLY`|
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
 |-h|Print help.|
 
