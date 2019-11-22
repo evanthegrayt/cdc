@@ -2,12 +2,25 @@
 # The default files and directories that mark the root of a repository. This is
 # set before `~/.cdcrc` is sourced so the user can overwrite OR append to it
 # from their config file.
-CDC_REPO_MARKERS+=(.git .git/ Rakefile Makefile .hg/ .bzr/ .svn/)
+CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
 
 ##
 # If $REPO_DIRS isn't set, and ~/.cdcrc exists, source it now.
 if [[ -z $REPO_DIRS && -f $HOME/.cdcrc ]]; then
     source $HOME/.cdcrc
+fi
+
+##
+# If colors are enabled, set color values if they're not already set.
+if ${CDC_COLOR:=true}; then
+    : ${CDC_ERROR_COLOR:='\e[0;91m'}
+    : ${CDC_SUCCESS_COLOR:='\e[0;92m'}
+    : ${CDC_WARNING_COLOR:='\e[0;93m'}
+    CDC_RESET='\e[0m'
+##
+# If colors are not enabled, unset the color variables.
+else
+    unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
 fi
 
 ##
@@ -31,6 +44,7 @@ cdc() {
     local marker
     local debug=false
     local did_cd=false
+    local allow_ignored=false
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
@@ -55,14 +69,20 @@ cdc() {
     # Check for the existence of required variables that should be set in
     # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
     if (( ${#CDC_DIRS[@]} == 0 )); then
-        echo 'You must set CDC_DIRS in a configuration file. See README.md.' >&2
+        _cdc_error 'You must set CDC_DIRS in a ~/.cdcrc file. See README.md.'
         return 2
     fi
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'DdcdhlrRptuU' opt 2>/dev/null; do
+    while getopts 'aDdcdhilLrRptuU' opt 2>/dev/null; do
         case $opt in
+
+            ##
+            # -a: Allow cd-ing to ignored directories.
+            a)
+                allow_ignored=true
+                ;;
 
             ##
             # -c: cd to the root of the current repository in the stack.
@@ -70,7 +90,7 @@ cdc() {
                 ##
                 # If the stack is empty, tell the user and return.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    echo 'Stack is empty.' >&2
+                    __cdc_print 'error' "Stack is empty."
                     return 1
                 fi
 
@@ -94,10 +114,31 @@ cdc() {
                 # each element to make them all at least 8 characters long.
                 # This is done because column has issues printing strings less
                 # than 8 bytes.
-                for directory in "${list[@]}"; do
-                    printf "%-8s\n" "${directory}"
-                done | column
+                printf "%-8s\n" "${list[@]}" | column
 
+                return 0
+                ;;
+
+            ##
+            # -i: List the directories that are ignored.
+            i)
+                ##
+                # If the ignore array is empty, return.
+                if (( ${#CDC_IGNORE[@]} == 0 )); then
+                    if $debug; then
+                        __cdc_print 'warn' 'No directories are being ignored.'
+                    fi
+                    return 0
+                fi
+
+                printf "%s\n" "${CDC_IGNORE[@]}" | column
+                return 0
+                ;;
+
+            ##
+            # -L: List the directories that are searched.
+            L)
+                printf "%s\n" "${CDC_DIRS[@]}" | column
                 return 0
                 ;;
 
@@ -115,7 +156,7 @@ cdc() {
                 # If the stack doesn't have at least two elements, tell the
                 # user and return.
                 if (( ${#CDC_HISTORY[@]} < 2 )); then
-                    echo 'Not enough directories in the stack.' >&2
+                    __cdc_print 'error' 'Not enough directories in the stack.'
                     return 1
                 fi
 
@@ -150,12 +191,11 @@ cdc() {
                 ##
                 # If the stack is empty, tell the user and return.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    echo 'Stack is empty.'
+                    __cdc_print 'error' 'Stack is empty.'
                 else
 
                     ##
                     # Print the array.
-                    # echo ${CDC_HISTORY[@]}
                     for cdc_history in ${CDC_HISTORY[@]}; do
                         printf "${cdc_history##*/} "
                     done
@@ -172,10 +212,10 @@ cdc() {
                 ##
                 # If there aren't enough directories to pop, notify the user.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    echo 'Stack is empty.' >&2
+                    __cdc_print 'error' 'Stack is empty.'
                     return 1
                 elif (( ${#CDC_HISTORY[@]} == 1 )); then
-                    echo 'At beginning of stack.' >&2
+                    __cdc_print 'error' 'At beginning of stack.'
                     return 1
                 fi
 
@@ -218,35 +258,54 @@ cdc() {
                 ;;
 
             ##
-            # -h: Print the help.
-            h)
-                echo 'USAGE: cdc [DIRECTORY]'
-                echo 'Options will always override variables set in ~/.cdcrc!'
-                echo '-l | List all directories that are cdc-able.'
-                echo '-d | List the directories in stack'
-                echo '-c | `cd` to the current directory in the stack'
-                echo '-p | `cd` to previous directory and pop from the stack.'
-                echo '-t | Toggle between the last two directories in the stack'
-                echo '-u | Push the directory onto the stack.'
-                echo '-U | Do not push the directory onto the stack'
-                echo '-r | 'Only cdc to repositories.
-                echo '-R | cd to any directory, even it iss not a repository.'
-                echo "-D | Debug mode for when things aren't working properly"
-                echo '-h | Print this help'
-
-                return 0
-                ;;
-
-            ##
             # -D: Debug
             D)
                 debug=true
                 ;;
 
             ##
+            # -h: Print the help.
+            h)
+                printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
+                printf "${CDC_WARNING_COLOR}\n\n"
+                printf 'Options will always override variables set in ~/.cdcrc!'
+                printf "${CDC_RESET}\n"
+                printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
+                echo ' | `cd` to the directory even if it is ignored.'
+                printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
+                echo ' | List all directories that are cdc-able.'
+                printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
+                echo ' | List all directories in which to search.'
+                printf "  ${CDC_WARNING_COLOR}-i${CDC_RESET}"
+                echo ' | List all directories that are to be ignored.'
+                printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
+                echo ' | List the directories in stack.'
+                printf "  ${CDC_WARNING_COLOR}-c${CDC_RESET}"
+                echo ' | `cd` to the current directory in the stack.'
+                printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
+                echo ' | `cd` to previous directory and pop from the stack.'
+                printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
+                echo ' | Toggle between the last two directories in the stack.'
+                printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
+                echo ' | Push the directory onto the stack.'
+                printf "  ${CDC_WARNING_COLOR}-U${CDC_RESET}"
+                echo ' | Do not push the directory onto the stack'
+                printf "  ${CDC_WARNING_COLOR}-r${CDC_RESET}"
+                echo ' | 'Only cdc to repositories.
+                printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
+                echo ' | cd to any directory, even it is not a repository.'
+                printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
+                echo ' | Debug mode for when unexpected things are happening.'
+                printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
+                echo ' | Print this help.'
+
+                return 0
+                ;;
+
+            ##
             # If the option isn't supported, tell the user and exit.
             *)
-                echo 'Invalid option.' >&2
+                __cdc_print 'error' 'Invalid option.'
                 return 1
                 ;;
         esac
@@ -267,8 +326,8 @@ cdc() {
     ##
     # Print usage and exit if the wrong number of arguments are passed.
     if (( $# != 1 )); then
-        echo 'USAGE: cdc [DIRECTORY]' >&2
-        echo '  Use `-h` for more help' >&2
+        __cdc_print 'error' 'USAGE: cdc [DIRECTORY]'
+        __cdc_print 'error' '  Use `-h` for more help'
         return 1
     fi
 
@@ -282,7 +341,8 @@ cdc() {
         # the array.
         if ! [[ -d $dir ]]; then
             if $debug; then
-                echo "DEBUG: $dir is not a valid directory." >&2
+                __cdc_print 'warn' \
+                    "$dir is in CDC_REPO_DIRS but isn't a directory."
             fi
             continue
         fi
@@ -294,9 +354,9 @@ cdc() {
 
         ##
         # If the directory exists, but is excluded, skip it.
-        elif __cdc_is_excluded_dir "$cd_dir"; then
+        elif ! $allow_ignored && __cdc_is_excluded_dir "$cd_dir"; then
             if $debug; then
-                echo "DEBUG: Match was found but it is ignored."
+                __cdc_print 'warn' 'Match was found but it is ignored.'
             fi
             continue
 
@@ -305,7 +365,7 @@ cdc() {
         # directory isn't a repo, skip it.
         elif $repos_only && ! __cdc_is_repo_dir "$dir/$cd_dir"; then
             if $debug; then
-                echo "DEBUG: Match was found but it is not a repository."
+                __cdc_print 'warn' 'Match was found but it is not a repository.'
             fi
             continue
         fi
@@ -334,7 +394,7 @@ cdc() {
                 ##
                 # If it doesn't exist as a directory, print message to stderr.
                 if $debug; then
-                    echo "DEBUG: [$subdir] does not exist in [$cd_dir]." >&2
+                    __cdc_print 'warn' "$subdir does not exist in $cd_dir."
                 fi
             fi
         fi
@@ -351,7 +411,7 @@ cdc() {
     ##
     # If no directory was found (the argument wasn't in the array), print
     # message to stderr and return unsuccessful code.
-    echo "[$cd_dir] not found in ${CDC_DIRS[@]}" >&2
+    __cdc_print 'error' "[$cd_dir] not found."
 
     return 2
 }
@@ -408,7 +468,8 @@ __cdc_repo_list() {
         # If the element isn't a directory that exists, move on.
         if ! [[ -d $dir ]]; then
             if $debug; then
-                echo "DEBUG: $dir is not a valid directory." >&2
+                __cdc_print 'warn' \
+                    "$dir is in CDC_REPO_DIRS but isn't a directory."
             fi
             continue
         fi
@@ -419,7 +480,7 @@ __cdc_repo_list() {
 
             ##
             # Remove trailing slash from directory.
-            subdir=${fulldir%?}
+            subdir=${fulldir%/}
 
             ##
             # Remove preceding directories from subdir.
@@ -444,6 +505,11 @@ __cdc_repo_list() {
     echo "${directories[@]}"
 }
 
+##
+# Is the directory a repository?
+#
+# @param string $dir
+# @return boolean
 __cdc_is_repo_dir() {
     local id
     local dir="$1"
@@ -466,4 +532,29 @@ __cdc_is_repo_dir() {
     done
 
     return 1
+}
+
+##
+# Print a message with colored output.
+#
+# @param string $level
+# @param string $msg
+# @return void
+__cdc_print() {
+    local level="$1"
+    local msg="$2"
+
+    ##
+    # Case the level of the message and print the appropriate color and message.
+    case $level in
+        'success')
+            printf "${CDC_SUCCESS_COLOR}SUCCESS:${CDC_RESET} $msg\n"
+            ;;
+        'warning')
+            printf "${CDC_WARNING_COLOR}WARNING:${CDC_RESET} $msg\n" >&2
+            ;;
+        'error')
+            printf "${CDC_ERROR_COLOR}ERROR:${CDC_RESET} $msg\n" >&2
+            ;;
+    esac
 }
