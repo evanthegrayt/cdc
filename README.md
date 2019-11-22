@@ -132,7 +132,7 @@ CDC_IGNORE=(notes_directory)
 
 ### Only recognize actual repositories
 You can set `CDC_REPOS_ONLY` in `~/.cdcrc` to make `cdc` only recognize
-repositories as directories. This is **disable by default**. You can also set
+repositories as directories. This is **disabled by default**. You can also set
 an array of files and directories that mark what you consider a repository.
 
 ```sh
@@ -142,6 +142,9 @@ CDC_REPOS_ONLY=true
 # default, but this is how you can add more in ~/.cdcrc
 CDC_REPO_MARKERS=(.git .git/ Rakefile Makefile .hg/ .bzr/ .svn/)
 ```
+
+Note that this setting can be overridden with the `-r` and `-R` options. See
+[options](#options) below.
 
 ### Automatically pushing to the history stack
 By default, every `cdc` call will push the directory onto the history stack. You
@@ -155,7 +158,7 @@ CDC_AUTO_PUSH=false
 
 You can then manually push directories onto the stack with `-u`. If you have
 `CDC_AUTO_PUSH` set to `true`, you can still `cdc` to a directory and not push
-it to the stack with the `-n` option. See [options](#options) below.
+it to the stack with the `-U` option. See [options](#options) below.
 
 ## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
