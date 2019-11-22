@@ -4,6 +4,14 @@ if [[ -z $REPO_DIRS && -f $HOME/.cdcrc ]]; then
     source $HOME/.cdcrc
 fi
 
+CDC_CACH="$ZSH_CACHE_DIR/cdc.cache"
+
+if [[ -f $CDC_CACHE ]]; then
+    CDC_IGNORE=(${CDC_IGNORE[@]})
+else
+    echo ${CDC_IGNORE[@]} > $CDC_CACHE
+fi
+
 ##
 # Set the array that will remember the history.
 CDC_HISTORY=()
