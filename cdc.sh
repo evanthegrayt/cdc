@@ -283,7 +283,7 @@ cdc() {
         if ([[ ! -d $dir/$cd_dir ]] || __cdc_is_excluded_dir "$cd_dir"); then
             continue
         elif $repos_only; then
-            if ! __cdc_is_repo_dir; then
+            if ! __cdc_is_repo_dir "$dir/$cd_dir"; then
                 if $debug; then
                     echo "DEBUG: Match was found but it was not a repository."
                 fi
@@ -374,6 +374,7 @@ __cdc_is_excluded_dir() {
 __cdc_repo_list() {
     local dir
     local subdir
+    local fulldir
     local directories=()
     local debug=${1:-false}
 
@@ -392,17 +393,17 @@ __cdc_repo_list() {
 
         ##
         # Loop through all subdirectories in the directory.
-        for subdir in "$dir"/*/; do
+        for fulldir in "$dir"/*/; do
 
             ##
             # Remove trailing slash from directory.
-            subdir=${subdir%?}
+            subdir=${fulldir%?}
 
             ##
             # Remove preceding directories from subdir.
             subdir=${subdir##*/}
 
-            if $CDC_REPOS_ONLY && ! __cdc_is_repo_dir; then
+            if $CDC_REPOS_ONLY && ! __cdc_is_repo_dir "$fulldir"; then
                 continue
             fi
 
@@ -420,11 +421,12 @@ __cdc_repo_list() {
 }
 
 __cdc_is_repo_dir() {
+    local dir="$1"
     local is_repo=1
 
     for marker in ${CDC_REPO_MARKERS[@]}; do
-        if [[ $marker == */ && -d $dir/$cd_dir/$marker ]] || \
-            [[ $marker != */ && -f $dir/$cd_dir/$marker ]]; then
+        if [[ $marker == */ && -d $dir/$marker ]] || \
+            [[ $marker != */ && -f $dir/$marker ]]; then
                 is_repo=0
                 break
         fi
