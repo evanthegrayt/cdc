@@ -23,8 +23,10 @@ for its arguments, as long as your `zsh`/`bash` version supports it. The plugin
 also includes session history, and has options available that behave similar to
 the `popd` and `dirs` commands.
 
-While this plugin was written for directories that contain `git` repositories,
-you can obviously use it for adding any directory to your `cd` path.
+While this plugin was written for directories that contain repositories, you can
+obviously use it for adding any directories to your `cd` path. In fact, this is
+the default behavior, but you *can* force `cdc` to only recognize repositories
+with a simple [configuration change](#only-recognize-actual-repositories).
 
 It's worth noting that I chose to make this function rather than editing
 `$CDPATH` because I don't like changing the default behavior of `cd`, but you
@@ -133,7 +135,8 @@ CDC_IGNORE=(notes_directory)
 ### Only recognize actual repositories
 You can set `CDC_REPOS_ONLY` in `~/.cdcrc` to make `cdc` only recognize
 repositories as directories. This is **disabled by default**. You can also set
-an array of files and directories that mark what you consider a repository.
+an array of files and directories that mark what you consider a repository. Note
+that markers that are directories *must* end with a `/`, and files must *not*.
 
 ```sh
 # Enable "repos-only" mode. Note, the default is false.
@@ -178,9 +181,9 @@ If the subdirectory doesn't exist, it will `cd` to the base directory, and then
 print a message to `stderr`.
 
 ### Options
-The plugin comes with a few available options. Most are for dealing with the
-directory history stack, similar to `pushd`, `popd`, and `dirs`. There's also a
-debug mode.
+The plugin comes with a few available options. Some are for dealing with the
+directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
+overriding variables set in `~/.cdcrc`. There's also a debug mode.
 
 |Flag|What it does|
 |:------|:-----------|
