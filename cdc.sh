@@ -1,4 +1,10 @@
 ##
+# The default files and directories that mark the root of a repository. This is
+# set before `~/.cdcrc` is sourced so the user can overwrite OR append to it
+# from their config file.
+CDC_REPO_MARKERS+=(.git .git/ Rakefile Makefile .hg/ .bzr/ .svn/)
+
+##
 # If $REPO_DIRS isn't set, and ~/.cdcrc exists, source it now.
 if [[ -z $REPO_DIRS && -f $HOME/.cdcrc ]]; then
     source $HOME/.cdcrc
@@ -7,10 +13,6 @@ fi
 ##
 # Set the array that will remember the history.
 CDC_HISTORY=()
-
-##
-# The default files and directories that mark the root of a repository.
-CDC_REPO_MARKERS+=(.git .git/ Rakefile Makefile .hg/ .bzr/ .svn/)
 
 ##
 # The actual function that the user calls from the command line.
@@ -168,7 +170,7 @@ cdc() {
             p)
 
                 ##
-                # If the stack is empty, tell the user and return.
+                # If there aren't enough directories to pop, notify the user.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
                     echo 'Stack is empty.' >&2
                     return 1
@@ -219,11 +221,16 @@ cdc() {
             # -h: Print the help.
             h)
                 echo 'USAGE: cdc [DIRECTORY]'
+                echo 'Options will always override variables set in ~/.cdcrc!'
                 echo '-l | List all directories that are cdc-able.'
                 echo '-d | List the directories in stack'
                 echo '-c | `cd` to the current directory in the stack'
                 echo '-p | `cd` to previous directory and pop from the stack.'
                 echo '-t | Toggle between the last two directories in the stack'
+                echo '-u | Push the directory onto the stack.'
+                echo '-U | Do not push the directory onto the stack'
+                echo '-r | 'Only cdc to repositories.
+                echo '-R | cd to any directory, even it iss not a repository.'
                 echo "-D | Debug mode for when things aren't working properly"
                 echo '-h | Print this help'
 
@@ -245,6 +252,8 @@ cdc() {
         esac
     done
 
+    ##
+    # If we did an action that already caused us to `cd`, return.
     if $did_cd; then
         return 0
     fi
@@ -279,25 +288,35 @@ cdc() {
         fi
 
         ##
-        # If the element is not a directory, or is excluded, move on.
-        if ([[ ! -d $dir/$cd_dir ]] || __cdc_is_excluded_dir "$cd_dir"); then
+        # If the element is not a directory, skip it.
+        if [[ ! -d $dir/$cd_dir ]]; then
             continue
-        elif $repos_only; then
-            if ! __cdc_is_repo_dir "$dir/$cd_dir"; then
-                if $debug; then
-                    echo "DEBUG: Match was found but it was not a repository."
-                fi
-                continue
+
+        ##
+        # If the directory exists, but is excluded, skip it.
+        elif __cdc_is_excluded_dir "$cd_dir"; then
+            if $debug; then
+                echo "DEBUG: Match was found but it is ignored."
             fi
+            continue
+
+        ##
+        # If the directory exists, but we're in repos-only mode and the
+        # directory isn't a repo, skip it.
+        elif $repos_only && ! __cdc_is_repo_dir "$dir/$cd_dir"; then
+            if $debug; then
+                echo "DEBUG: Match was found but it is not a repository."
+            fi
+            continue
         fi
 
         ##
-        # By this point, the parameter obviously exists as a directory, so we
-        # save it to a variable.
+        # By this point, the parameter obviously exists as a valid directory,
+        # so we save it to a variable.
         wdir="$dir/$cd_dir"
 
         ##
-        # Add the directory to the history array.
+        # If pushdir is true, add the directory to the history stack.
         if $pushdir; then
             CDC_HISTORY+=("$wdir")
         fi
@@ -333,6 +352,7 @@ cdc() {
     # If no directory was found (the argument wasn't in the array), print
     # message to stderr and return unsuccessful code.
     echo "[$cd_dir] not found in ${CDC_DIRS[@]}" >&2
+
     return 2
 }
 
@@ -346,7 +366,9 @@ __cdc_is_excluded_dir() {
 
     ##
     # If $CDC_IGNORE isn't defined or is empty, return "false".
-    ([[ -z $CDC_IGNORE ]] || (( ${#CDC_IGNORE[@]} == 0 ))) && return 1
+    if ([[ -z $CDC_IGNORE ]] || (( ${#CDC_IGNORE[@]} == 0 ))); then
+        return 1
+    fi
 
     ##
     # Loop through each element of $CDC_IGNORE array.
@@ -403,6 +425,8 @@ __cdc_repo_list() {
             # Remove preceding directories from subdir.
             subdir=${subdir##*/}
 
+            ##
+            # If in repos-only mode, and directory isn't a repo, skip it.
             if $CDC_REPOS_ONLY && ! __cdc_is_repo_dir "$fulldir"; then
                 continue
             fi
@@ -421,16 +445,25 @@ __cdc_repo_list() {
 }
 
 __cdc_is_repo_dir() {
+    local id
     local dir="$1"
-    local is_repo=1
 
+    ##
+    # Spin through all known repository markers.
     for marker in ${CDC_REPO_MARKERS[@]}; do
-        if [[ $marker == */ && -d $dir/$marker ]] || \
-            [[ $marker != */ && -f $dir/$marker ]]; then
-                is_repo=0
-                break
+
+        ##
+        # Repo identifier is the passed directory plus the known marker.
+        id="$dir/$marker"
+
+        ##
+        # If the marker ends with a slash and it's a valid directory, or if it
+        # doesn't end with a slash and it's a valid file, then the directory is
+        # a repository.
+        if [[ $id == */ && -d $id ]] || [[ $id != */ && -f $id ]]; then
+            return 0
         fi
     done
 
-    return $is_repo
+    return 1
 }
