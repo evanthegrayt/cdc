@@ -12,6 +12,7 @@ fi
 
 ##
 # If colors are enabled, set color values if they're not already set.
+# TODO Add flag to manipulate this setting.
 if ${CDC_COLOR:=true}; then
     : ${CDC_ERROR_COLOR:='\e[0;91m'}
     : ${CDC_SUCCESS_COLOR:='\e[0;92m'}
@@ -90,7 +91,7 @@ cdc() {
                 ##
                 # If the stack is empty, tell the user and return.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    __cdc_print 'error' "Stack is empty."
+                    __cdc_print 'error' "Stack is empty." $debug
                     return 1
                 fi
 
@@ -126,7 +127,8 @@ cdc() {
                 # If the ignore array is empty, return.
                 if (( ${#CDC_IGNORE[@]} == 0 )); then
                     if $debug; then
-                        __cdc_print 'warn' 'No directories are being ignored.'
+                        __cdc_print 'warn' 'No directories are being ignored.' \
+                            $debug
                     fi
                     return 0
                 fi
@@ -156,7 +158,8 @@ cdc() {
                 # If the stack doesn't have at least two elements, tell the
                 # user and return.
                 if (( ${#CDC_HISTORY[@]} < 2 )); then
-                    __cdc_print 'error' 'Not enough directories in the stack.'
+                    __cdc_print 'error' 'Not enough directories in the stack.' \
+                        $debug
                     return 1
                 fi
 
@@ -191,7 +194,7 @@ cdc() {
                 ##
                 # If the stack is empty, tell the user and return.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    __cdc_print 'error' 'Stack is empty.'
+                    __cdc_print 'error' 'Stack is empty.' $debug
                 else
 
                     ##
@@ -212,10 +215,10 @@ cdc() {
                 ##
                 # If there aren't enough directories to pop, notify the user.
                 if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    __cdc_print 'error' 'Stack is empty.'
+                    __cdc_print 'error' 'Stack is empty.' $debug
                     return 1
                 elif (( ${#CDC_HISTORY[@]} == 1 )); then
-                    __cdc_print 'error' 'At beginning of stack.'
+                    __cdc_print 'error' 'At beginning of stack.' $debug
                     return 1
                 fi
 
@@ -260,6 +263,26 @@ cdc() {
             ##
             # -D: Debug
             D)
+                echo "========================= ENV ==========================="
+                printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
+                    "${CDC_DIRS[@]}"
+                printf "CDC_IGNORE       += ${CDC_WARNING_COLOR}%s$CDC_RESET\n"\
+                    "${CDC_IGNORE[@]}"
+                echo
+                printf "CDC_AUTO_PUSH     = %s\n" \
+                    $( __cdc_print 'boolean' $CDC_AUTO_PUSH )
+                printf "CDC_REPOS_ONLY    = %s\n" \
+                    $( __cdc_print 'boolean' $CDC_REPOS_ONLY )
+                printf "CDC_COLOR         = %s\n" \
+                    $( __cdc_print 'boolean' $CDC_COLOR )
+                echo
+                printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
+                    "$CDC_SUCCESS_COLOR"
+                printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
+                    "$CDC_WARNING_COLOR"
+                printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
+                    "$CDC_ERROR_COLOR"
+                echo "======================= RUNTIME ========================="
                 debug=true
                 ;;
 
@@ -305,7 +328,7 @@ cdc() {
             ##
             # If the option isn't supported, tell the user and exit.
             *)
-                __cdc_print 'error' 'Invalid option.'
+                __cdc_print 'error' 'Invalid option.' $debug
                 return 1
                 ;;
         esac
@@ -326,8 +349,8 @@ cdc() {
     ##
     # Print usage and exit if the wrong number of arguments are passed.
     if (( $# != 1 )); then
-        __cdc_print 'error' 'USAGE: cdc [DIRECTORY]'
-        __cdc_print 'error' '  Use `-h` for more help'
+        __cdc_print 'error' 'USAGE: cdc [DIRECTORY]' $debug
+        __cdc_print 'error' '  Use `-h` for more help' $debug
         return 1
     fi
 
@@ -342,7 +365,7 @@ cdc() {
         if ! [[ -d $dir ]]; then
             if $debug; then
                 __cdc_print 'warn' \
-                    "$dir is in CDC_REPO_DIRS but isn't a directory."
+                    "$dir is in CDC_REPO_DIRS but isn't a directory." $debug
             fi
             continue
         fi
@@ -356,7 +379,7 @@ cdc() {
         # If the directory exists, but is excluded, skip it.
         elif ! $allow_ignored && __cdc_is_excluded_dir "$cd_dir"; then
             if $debug; then
-                __cdc_print 'warn' 'Match was found but it is ignored.'
+                __cdc_print 'warn' 'Match was found but it is ignored.' $debug
             fi
             continue
 
@@ -365,7 +388,8 @@ cdc() {
         # directory isn't a repo, skip it.
         elif $repos_only && ! __cdc_is_repo_dir "$dir/$cd_dir"; then
             if $debug; then
-                __cdc_print 'warn' 'Match was found but it is not a repository.'
+                __cdc_print 'warn' \
+                    'Match was found but it is not a repository.' $debug
             fi
             continue
         fi
@@ -394,7 +418,8 @@ cdc() {
                 ##
                 # If it doesn't exist as a directory, print message to stderr.
                 if $debug; then
-                    __cdc_print 'warn' "$subdir does not exist in $cd_dir."
+                    __cdc_print 'warn' "$subdir does not exist in $cd_dir." \
+                        $debug
                 fi
             fi
         fi
@@ -411,7 +436,7 @@ cdc() {
     ##
     # If no directory was found (the argument wasn't in the array), print
     # message to stderr and return unsuccessful code.
-    __cdc_print 'error' "[$cd_dir] not found."
+    __cdc_print 'error' "[$cd_dir] not found." $debug
 
     return 2
 }
@@ -536,25 +561,45 @@ __cdc_is_repo_dir() {
 
 ##
 # Print a message with colored output.
+# TODO This function can definitely be DRY-ed up.
 #
 # @param string $level
-# @param string $msg
+# @param string $message
 # @return void
 __cdc_print() {
     local level="$1"
-    local msg="$2"
+    local message="$2"
+    local debug="$3"
+
+    ##
+    # If we're not debugging, just print the message and return.
+    if ! $debug; then
+        echo $message
+        return
+    fi
 
     ##
     # Case the level of the message and print the appropriate color and message.
     case $level in
         'success')
-            printf "${CDC_SUCCESS_COLOR}SUCCESS:${CDC_RESET} $msg\n"
+            printf "${CDC_SUCCESS_COLOR}SUCCESS:${CDC_RESET} $message\n"
             ;;
         'warning')
-            printf "${CDC_WARNING_COLOR}WARNING:${CDC_RESET} $msg\n" >&2
+            printf "${CDC_WARNING_COLOR}WARNING:${CDC_RESET} $message\n" >&2
             ;;
         'error')
-            printf "${CDC_ERROR_COLOR}ERROR:${CDC_RESET} $msg\n" >&2
+            printf "${CDC_ERROR_COLOR}ERROR:${CDC_RESET} $message\n" >&2
+            ;;
+        ##
+        # Hijacking this method to also print our debug booleans.
+        'boolean')
+            ##
+            # If the variable is true, return with success color.
+            if $message; then
+                printf "${CDC_SUCCESS_COLOR}true$CDC_RESET"
+            else
+                printf "${CDC_ERROR_COLOR}false$CDC_RESET"
+            fi
             ;;
     esac
 }
