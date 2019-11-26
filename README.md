@@ -11,6 +11,7 @@
   - [Ignoring certain directories](#ignoring-certain-directories)
   - [Only recognize actual repositories](#only-recognize-actual-repositories)
   - [Automatically pushing to the history stack](#automatically-pushing-to-the-history-stack)
+  - [Colors](#colors)
 - [Usage](#usage)
   - [Options](#options)
 - [Reporting Bugs](#reporting-bugs)
@@ -21,7 +22,7 @@ change directory to the passed argument, no matter which of the
 repository-containing directories it's in. The plugin comes with tab-completion
 for its arguments, as long as your `zsh`/`bash` version supports it. The plugin
 also includes session history, and has options available that behave similar to
-the `popd` and `dirs` commands.
+the `pushd`, `popd`, and `dirs` commands.
 
 While this plugin was written for directories that contain repositories, you can
 obviously use it for adding any directories to your `cd` path. In fact, this is
@@ -96,7 +97,8 @@ source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
 The following settings require variables to be set from either a file called
 `~/.cdcrc`, or a shell startup file such as `~/.zshrc` or `~/.bash_profile`. The
 following instructions will default to using `~/.cdcrc`, but just know that you
-have the other option.
+have the other option. Just note, if you are going to put the variables in a
+startup file, set them *after* you source the plugin.
 
 Note that the `~/.cdcrc` file is just a shell script that sets values, so you
 can use `bash` conditionals if you'd like to use the same config file on
@@ -136,14 +138,20 @@ CDC_IGNORE=(notes_directory)
 You can set `CDC_REPOS_ONLY` in `~/.cdcrc` to make `cdc` only recognize
 repositories as directories. This is **disabled by default**. You can also set
 an array of files and directories that mark what you consider a repository. Note
-that markers that are directories *must* end with a `/`, and files must *not*.
+that markers that are directories must end with a `/`, while files must not.
 
 ```sh
 # Enable "repos-only" mode. Note, the default is false.
 CDC_REPOS_ONLY=true
 # Set repository markers with the following. Note, the following is already the
-# default, but this is how you can add more in ~/.cdcrc
-CDC_REPO_MARKERS=(.git .git/ Rakefile Makefile .hg/ .bzr/ .svn/)
+# default, but this is how you can overwrite it in ~/.cdcrc.
+CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
+```
+If you want to add markers to the existing array without overwriting it, you
+can use `+=` when assigning it.
+
+```sh
+CDC_REPO_MARKERS+=(.example_directory_marker/ .example_file_marker)
 ```
 
 Note that this setting can be overridden with the `-r` and `-R` options. See
@@ -163,18 +171,30 @@ You can then manually push directories onto the stack with `-u`. If you have
 `CDC_AUTO_PUSH` set to `true`, you can still `cdc` to a directory and not push
 it to the stack with the `-U` option. See [options](#options) below.
 
+### Colors
+You can enable/disable colored terminal output, and even change the colors, by
+adding the following lines to your `~/.cdcrc`.
+
+```sh
+CDC_COLOR=false               # Default: true. Setting to false disables colors
+# The following lines would make the colored output bold.
+CDC_SUCCESS_COLOR='\e[1;92m'  # Bold green.   Default: '\e[0;92m' (green)
+CDC_WARNING_COLOR='\e[1;93m'  # Bold yellow.  Default: '\e[0;93m' (yellow)
+CDC_ERROR_COLOR='\e[1;91m'    # Bold red.     Default: '\e[0;91m' (red)
+```
+
 ## Usage
 Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
 to change to that directory.
 
 You *can* append subdirectories, and it will work; however, this is an
-experimental feature, and I don't have tab-autocompletion working for this yet
-(any help with [the issue](https://github.com/evanthegrayt/cdc/issues/2) would
-be greatly appreciated). For example:
+experimental feature, and I don't have tab-completion working for this yet (any
+help with [the issue](https://github.com/evanthegrayt/cdc/issues/2) would be
+greatly appreciated). For example:
 
 ```sh
-cdc dir_with_repos/bin
+cdc repo/bin
 ```
 
 If the subdirectory doesn't exist, it will `cd` to the base directory, and then
@@ -187,22 +207,20 @@ overriding variables set in `~/.cdcrc`. There's also a debug mode.
 
 |Flag|What it does|
 |:------|:-----------|
-|-l|List all directories that you can `cdc` to. Same as tab-completion.|
+|-a|Allow the plugin to `cd` to ignored directories.|
+|-l|List all directories to which you can `cdc`. Same as tab-completion.|
+|-L|List the directories in which `cdc` will search.|
+|-i|List the directories that are to be ignored.|
 |-d|List directories in history stack. Similar to the `dirs` command.|
 |-c|`cd` to the current directory in the history stack.|
 |-t|Toggle to the last directory, similar to `cd -`. Rearranges history stack.|
 |-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
-|-u|Push the directory onto the stack when `CDC_AUTO_PUSH=false`.|
-|-U|Do *not* push the directory onto the stack when `CDC_AUTO_PUSH=true`.|
-|-r|Only `cdc` to repositories. Overrides `$CDC_REPOS_ONLY`|
-|-R|`cd` to any directory, even it's not a repository. Overrides `$CDC_REPOS_ONLY`|
+|-u|Push the directory onto the stack. Similar to the `pushd` command.|
+|-U|Do not push the directory onto the stack.|
+|-r|Only `cd` to repositories.|
+|-R|`cd` to the directory even if it's not a repository.|
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
 |-h|Print help.|
-
-There is no option to push to the stack, as this is done automatically with each
-`cdc` call. If you want that behavior, consider just using the actual `pushd`
-and `popd` commands. If you *really* want this behavior, let me know by
-[creating an issue](https://github.com/evanthegrayt/cdc/issues/new).
 
 ## Reporting bugs
 If you have an idea or find a bug, please [create an
