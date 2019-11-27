@@ -1,30 +1,4 @@
 ##
-# The default files and directories that mark the root of a repository. This is
-# set before `~/.cdcrc` is sourced so the user can overwrite OR append to it
-# from their config file.
-CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
-
-##
-# If $REPO_DIRS isn't set, and ~/.cdcrc exists, source it now.
-if [[ -z $REPO_DIRS && -f $HOME/.cdcrc ]]; then
-    source $HOME/.cdcrc
-fi
-
-##
-# If colors are enabled, set color values if they're not already set.
-# TODO Add flag to manipulate this setting.
-if ${CDC_COLOR:=true}; then
-    : ${CDC_ERROR_COLOR:='\e[0;91m'}
-    : ${CDC_SUCCESS_COLOR:='\e[0;92m'}
-    : ${CDC_WARNING_COLOR:='\e[0;93m'}
-    CDC_RESET='\e[0m'
-##
-# If colors are not enabled, unset the color variables.
-else
-    unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
-fi
-
-##
 # Set the array that will remember the history.
 CDC_HISTORY=()
 
@@ -37,6 +11,31 @@ CDC_HISTORY=()
 # @param string $cd_dir
 # @return void
 cdc() {
+    ##
+    # The default files and directories that mark the root of a repository.
+    # This is set before `~/.cdcrc` is sourced so the user can overwrite OR
+    # append to it from their config file.
+    CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
+
+    ##
+    # If $REPO_DIRS isn't set, and ~/.cdcrc exists, source it now.
+    if [[ -f $HOME/.cdcrc ]]; then
+        source $HOME/.cdcrc
+    fi
+
+    ##
+    # If colors are enabled, set color values if they're not already set.
+    # TODO Add flag to manipulate this setting.
+    if ${CDC_COLOR:=true}; then
+        : ${CDC_ERROR_COLOR:='\e[0;91m'}
+        : ${CDC_SUCCESS_COLOR:='\e[0;92m'}
+        : ${CDC_WARNING_COLOR:='\e[0;93m'}
+        CDC_RESET='\e[0m'
+    ##
+    # If colors are not enabled, unset the color variables.
+    else
+        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
+    fi
 
     ##
     # Set local vars to avoid environment pollution.
@@ -48,6 +47,7 @@ cdc() {
     local cdc_last_element
     local cdc_next_to_last_element
     local cdc_history
+    local rc=0
     local cdc_list_dirs=false
     local cdc_list_searched_dirs=false
     local cdc_toggle=false
@@ -83,7 +83,7 @@ cdc() {
     # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
     if (( ${#CDC_DIRS[@]} == 0 )); then
         _cdc_error 'You must set CDC_DIRS in a ~/.cdcrc file. See README.md.'
-        return 2
+        return 1
     fi
 
     ##
@@ -214,11 +214,17 @@ cdc() {
     done
 
     if $cdc_list_searched_dirs; then
+        if $debug; then
+            _cdc_print 'success' 'Listing searched directories.' $debug
+        fi
         printf "%s\n" "${CDC_DIRS[@]}" | column
         should_return=true
     fi
 
     if $cdc_list_dirs; then
+        if $debug; then
+            _cdc_print 'success' 'Listing available directories.' $debug
+        fi
         ##
         # Get the list of directories.
         list=($( _cdc_repo_list $debug ))
@@ -239,28 +245,34 @@ cdc() {
         # user and return.
         if (( ${#CDC_HISTORY[@]} < 2 )); then
             _cdc_print 'error' 'Not enough directories in the stack.' $debug
-            return 1
+            (( rc++ ))
+        else
+            if $debug; then
+                _cdc_print 'success' 'Toggling between last two directories.' \
+                    $debug
+            fi
+
+            ##
+            # Flip the last two elements of the array.
+            # HACK: When you unset an element in an array, it still exists; it's
+            # just null, so you have to re-declare the array. If anyone knows a
+            # better way, please let me know.
+            cdc_last_element=${CDC_HISTORY[-1]}
+            cdc_next_to_last_element=${CDC_HISTORY[-2]}
+            unset 'CDC_HISTORY[-1]'
+            CDC_HISTORY=(${CDC_HISTORY[@]})
+            unset 'CDC_HISTORY[-1]'
+            CDC_HISTORY=(
+                ${CDC_HISTORY[@]}
+                $cdc_last_element
+                $cdc_next_to_last_element
+            )
+
+            ##
+            # Finally, cd to the last directory in the stack.
+            cd ${CDC_HISTORY[-1]}
+
         fi
-
-        ##
-        # Flip the last two elements of the array.
-        # HACK: When you unset an element in an array, it still exists; it's
-        # just null, so you have to re-declare the array. If anyone knows a
-        # better way, please let me know.
-        cdc_last_element=${CDC_HISTORY[-1]}
-        cdc_next_to_last_element=${CDC_HISTORY[-2]}
-        unset 'CDC_HISTORY[-1]'
-        CDC_HISTORY=(${CDC_HISTORY[@]})
-        unset 'CDC_HISTORY[-1]'
-        CDC_HISTORY=(
-            ${CDC_HISTORY[@]}
-            $cdc_last_element
-            $cdc_next_to_last_element
-        )
-
-        ##
-        # Finally, cd to the last directory in the stack.
-        cd ${CDC_HISTORY[-1]}
 
         should_return=true
     fi
@@ -272,10 +284,14 @@ cdc() {
             if $debug; then
                 _cdc_print 'warn' 'No directories are being ignored.' $debug
             fi
-            return 0
+        else
+            if $debug; then
+                _cdc_print 'success' 'Listing ignored directories.' $debug
+            fi
+
+            printf "%s\n" "${CDC_IGNORE[@]}" | column
         fi
 
-        printf "%s\n" "${CDC_IGNORE[@]}" | column
         should_return=true
     fi
 
@@ -284,7 +300,12 @@ cdc() {
         # If the stack is empty, tell the user and return.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
             _cdc_print 'error' 'Stack is empty.' $debug
+            (( rc++ ))
         else
+
+            if $debug; then
+                _cdc_print 'success' 'Listing directories in history.' $debug
+            fi
 
             ##
             # Print the array.
@@ -302,12 +323,17 @@ cdc() {
         # If the stack is empty, tell the user and return.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
             _cdc_print 'error' "Stack is empty." $debug
-            return 1
-        fi
+            (( rc++ ))
+        else
+            if $debug; then
+                _cdc_print 'success' \
+                    'Changing to current directory in history.' $debug
+            fi
 
-        ##
-        # cd to the root of the last repository in the history.
-        cd ${CDC_HISTORY[-1]}
+            ##
+            # cd to the root of the last repository in the history.
+            cd ${CDC_HISTORY[-1]}
+        fi
 
         should_return=true
     fi
@@ -317,22 +343,27 @@ cdc() {
         # If there aren't enough directories to pop, notify the user.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
             _cdc_print 'error' 'Stack is empty.' $debug
-            return 1
+            (( rc++ ))
         elif (( ${#CDC_HISTORY[@]} == 1 )); then
             _cdc_print 'error' 'At beginning of stack.' $debug
-            return 1
+            (( rc++ ))
+        else
+            if $debug; then
+                _cdc_print 'success' 'Changing to last directory in history.' \
+                    $debug
+            fi
+
+            ##
+            # Unset the last element of the array, then re-declare it.
+            # HACK: Again, this feels awful, but I can't get it to work for
+            # both bash and zsh unless I do something like this.
+            unset 'CDC_HISTORY[-1]'
+            CDC_HISTORY=(${CDC_HISTORY[@]})
+
+            ##
+            # cd to the previous diretory in the stack.
+            cd ${CDC_HISTORY[-1]}
         fi
-
-        ##
-        # Unset the last element of the array, then re-declare it.
-        # HACK: Again, this feels awful, but I can't get it to work for
-        # both bash and zsh unless I do something like this.
-        unset 'CDC_HISTORY[-1]'
-        CDC_HISTORY=(${CDC_HISTORY[@]})
-
-        ##
-        # cd to the previous diretory in the stack.
-        cd ${CDC_HISTORY[-1]}
 
         should_return=true
     fi
@@ -340,7 +371,7 @@ cdc() {
     ##
     # If we did an action that already caused us to `cd`, return.
     if $should_return; then
-        return 0
+        return $rc
     fi
 
     ##
