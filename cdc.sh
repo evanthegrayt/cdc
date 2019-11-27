@@ -584,7 +584,7 @@ __cdc_print() {
         'success')
             printf "${CDC_SUCCESS_COLOR}SUCCESS:${CDC_RESET} $message\n"
             ;;
-        'warning')
+        'warn')
             printf "${CDC_WARNING_COLOR}WARNING:${CDC_RESET} $message\n" >&2
             ;;
         'error')

@@ -11,7 +11,7 @@
   - [Ignoring certain directories](#ignoring-certain-directories)
   - [Only recognize actual repositories](#only-recognize-actual-repositories)
   - [Automatically pushing to the history stack](#automatically-pushing-to-the-history-stack)
-  - [Colors](#colors)
+  - [Colored Output](#colored-output)
 - [Usage](#usage)
   - [Options](#options)
 - [Reporting Bugs](#reporting-bugs)
@@ -171,7 +171,7 @@ You can then manually push directories onto the stack with `-u`. If you have
 `CDC_AUTO_PUSH` set to `true`, you can still `cdc` to a directory and not push
 it to the stack with the `-U` option. See [options](#options) below.
 
-### Colors
+### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
 adding the following lines to your `~/.cdcrc`.
 
