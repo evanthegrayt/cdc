@@ -41,11 +41,23 @@ cdc() {
     ##
     # Set local vars to avoid environment pollution.
     local dir
+    local list
+    local directory
     local wdir
     local marker
+    local cdc_last_element
+    local cdc_next_to_last_element
+    local cdc_history
+    local cdc_list_dirs=false
+    local cdc_list_searched_dirs=false
+    local cdc_toggle=false
     local debug=false
-    local did_cd=false
+    local should_return=false
     local allow_ignored=false
+    local cdc_current=false
+    local cdc_pop=false
+    local cdc_show_history=false
+    local cdc_list_ignored=false
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
@@ -76,189 +88,56 @@ cdc() {
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'aDdcdhilLrRptuU' opt 2>/dev/null; do
+    while getopts 'aDdndhilLrRptuU' opt 2>/dev/null; do
         case $opt in
 
             ##
             # -a: Allow cd-ing to ignored directories.
-            a)
-                allow_ignored=true
-                ;;
+            a) allow_ignored=true ;;
 
             ##
-            # -c: cd to the root of the current repository in the stack.
-            c)
-                ##
-                # If the stack is empty, tell the user and return.
-                if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    __cdc_print 'error' "Stack is empty." $debug
-                    return 1
-                fi
-
-                ##
-                # cd to the root of the last repository in the history.
-                cd ${CDC_HISTORY[-1]}
-
-                did_cd=true
-                ;;
+            # -n: cd to the root of the current repository in the stack.
+            n) cdc_current=true ;;
 
             ##
             # -l: List the directories that are cdc-able.
-            l)
-                ##
-                # Get the list of directories.
-                local list=($( __cdc_repo_list $debug ))
-                local directory
-
-                ##
-                # Print the list and pipe to column for nice output. Also pad
-                # each element to make them all at least 8 characters long.
-                # This is done because column has issues printing strings less
-                # than 8 bytes.
-                printf "%-8s\n" "${list[@]}" | column
-
-                return 0
-                ;;
+            l) cdc_list_dirs=true ;;
 
             ##
             # -i: List the directories that are ignored.
-            i)
-                ##
-                # If the ignore array is empty, return.
-                if (( ${#CDC_IGNORE[@]} == 0 )); then
-                    if $debug; then
-                        __cdc_print 'warn' 'No directories are being ignored.' \
-                            $debug
-                    fi
-                    return 0
-                fi
-
-                printf "%s\n" "${CDC_IGNORE[@]}" | column
-                return 0
-                ;;
+            i) cdc_list_ignored=true ;;
 
             ##
             # -L: List the directories that are searched.
-            L)
-                printf "%s\n" "${CDC_DIRS[@]}" | column
-                return 0
-                ;;
+            L) cdc_list_searched_dirs=true ;;
 
             ##
             # -t: cd to the last repo, but don't add it to the stack.
-            # HACK: This reeks of code-smell, but arrays are awful in shell
-            # scripts. If you can think of a better way to accomplish this,
-            # please let me know. Just remember, it needs to be compatible with
-            # both bash and zsh.
-            t)
-                local cdc_last_element
-                local cdc_next_to_last_element
-
-                ##
-                # If the stack doesn't have at least two elements, tell the
-                # user and return.
-                if (( ${#CDC_HISTORY[@]} < 2 )); then
-                    __cdc_print 'error' 'Not enough directories in the stack.' \
-                        $debug
-                    return 1
-                fi
-
-                ##
-                # Flip the last two elements of the array.
-                # HACK: When you unset an element in an array, it still exists;
-                # it's just null, so you have to re-declare the array. If
-                # anyone knows a better way, please let me know.
-                cdc_last_element=${CDC_HISTORY[-1]}
-                cdc_next_to_last_element=${CDC_HISTORY[-2]}
-                unset 'CDC_HISTORY[-1]'
-                CDC_HISTORY=(${CDC_HISTORY[@]})
-                unset 'CDC_HISTORY[-1]'
-                CDC_HISTORY=(
-                    ${CDC_HISTORY[@]}
-                    $cdc_last_element
-                    $cdc_next_to_last_element
-                )
-
-                ##
-                # Finally, cd to the last directory in the stack.
-                cd ${CDC_HISTORY[-1]}
-
-                did_cd=true
-                ;;
+            t) cdc_toggle=true ;;
 
             ##
             # -d: List cdc history.
-            d)
-                local cdc_history
-
-                ##
-                # If the stack is empty, tell the user and return.
-                if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    __cdc_print 'error' 'Stack is empty.' $debug
-                else
-
-                    ##
-                    # Print the array.
-                    for cdc_history in ${CDC_HISTORY[@]}; do
-                        printf "${cdc_history##*/} "
-                    done
-                    echo
-                fi
-
-                did_cd=true
-                ;;
+            d) cdc_show_history=true ;;
 
             ##
             # -p: cd to the last element in the stack and pop it from the array.
-            p)
-
-                ##
-                # If there aren't enough directories to pop, notify the user.
-                if (( ${#CDC_HISTORY[@]} == 0 )); then
-                    __cdc_print 'error' 'Stack is empty.' $debug
-                    return 1
-                elif (( ${#CDC_HISTORY[@]} == 1 )); then
-                    __cdc_print 'error' 'At beginning of stack.' $debug
-                    return 1
-                fi
-
-                ##
-                # Unset the last element of the array, then re-declare it.
-                # HACK: Again, this feels awful, but I can't get it to work for
-                # both bash and zsh unless I do something like this.
-                unset 'CDC_HISTORY[-1]'
-                CDC_HISTORY=(${CDC_HISTORY[@]})
-
-                ##
-                # cd to the previous diretory in the stack.
-                cd ${CDC_HISTORY[-1]}
-
-                did_cd=true
-                ;;
+            p) cdc_pop=true ;;
 
             ##
             # -r: Force cdc to only cd to repositories.
-            r)
-                repos_only=true
-                ;;
+            r) repos_only=true ;;
 
             ##
             # -R: Force cdc to NOT only cd to repositories.
-            R)
-                repos_only=false
-                ;;
+            R) repos_only=false ;;
 
             ##
             # -u: Push the directory onto the history stack.
-            u)
-                pushdir=true
-                ;;
+            u) pushdir=true ;;
 
             ##
             # -U: Do not push the directory onto the history stack.
-            U)
-                pushdir=false
-                ;;
+            U) pushdir=false ;;
 
             ##
             # -D: Debug
@@ -270,11 +149,11 @@ cdc() {
                     "${CDC_IGNORE[@]}"
                 echo
                 printf "CDC_AUTO_PUSH     = %s\n" \
-                    $( __cdc_print 'boolean' $CDC_AUTO_PUSH )
+                    $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
                 printf "CDC_REPOS_ONLY    = %s\n" \
-                    $( __cdc_print 'boolean' $CDC_REPOS_ONLY )
+                    $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
                 printf "CDC_COLOR         = %s\n" \
-                    $( __cdc_print 'boolean' $CDC_COLOR )
+                    $( _cdc_print 'boolean' $CDC_COLOR )
                 echo
                 printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
                     "$CDC_SUCCESS_COLOR"
@@ -303,7 +182,7 @@ cdc() {
                 echo ' | List all directories that are to be ignored.'
                 printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
                 echo ' | List the directories in stack.'
-                printf "  ${CDC_WARNING_COLOR}-c${CDC_RESET}"
+                printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
                 echo ' | `cd` to the current directory in the stack.'
                 printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
                 echo ' | `cd` to previous directory and pop from the stack.'
@@ -328,15 +207,139 @@ cdc() {
             ##
             # If the option isn't supported, tell the user and exit.
             *)
-                __cdc_print 'error' 'Invalid option.' $debug
+                _cdc_print 'error' 'Invalid option.' $debug
                 return 1
                 ;;
         esac
     done
 
+    if $cdc_list_searched_dirs; then
+        printf "%s\n" "${CDC_DIRS[@]}" | column
+        should_return=true
+    fi
+
+    if $cdc_list_dirs; then
+        ##
+        # Get the list of directories.
+        list=($( _cdc_repo_list $debug ))
+
+        ##
+        # Print the list and pipe to column for nice output. Also pad
+        # each element to make them all at least 8 characters long.
+        # This is done because column has issues printing strings less
+        # than 8 bytes.
+        printf "%-8s\n" "${list[@]}" | column
+
+        should_return=true
+    fi
+
+    if $cdc_toggle; then
+        ##
+        # If the stack doesn't have at least two elements, tell the
+        # user and return.
+        if (( ${#CDC_HISTORY[@]} < 2 )); then
+            _cdc_print 'error' 'Not enough directories in the stack.' $debug
+            return 1
+        fi
+
+        ##
+        # Flip the last two elements of the array.
+        # HACK: When you unset an element in an array, it still exists; it's
+        # just null, so you have to re-declare the array. If anyone knows a
+        # better way, please let me know.
+        cdc_last_element=${CDC_HISTORY[-1]}
+        cdc_next_to_last_element=${CDC_HISTORY[-2]}
+        unset 'CDC_HISTORY[-1]'
+        CDC_HISTORY=(${CDC_HISTORY[@]})
+        unset 'CDC_HISTORY[-1]'
+        CDC_HISTORY=(
+            ${CDC_HISTORY[@]}
+            $cdc_last_element
+            $cdc_next_to_last_element
+        )
+
+        ##
+        # Finally, cd to the last directory in the stack.
+        cd ${CDC_HISTORY[-1]}
+
+        should_return=true
+    fi
+
+    if $cdc_list_ignored; then
+        ##
+        # If the ignore array is empty, return.
+        if (( ${#CDC_IGNORE[@]} == 0 )); then
+            if $debug; then
+                _cdc_print 'warn' 'No directories are being ignored.' $debug
+            fi
+            return 0
+        fi
+
+        printf "%s\n" "${CDC_IGNORE[@]}" | column
+        should_return=true
+    fi
+
+    if $cdc_show_history; then
+        ##
+        # If the stack is empty, tell the user and return.
+        if (( ${#CDC_HISTORY[@]} == 0 )); then
+            _cdc_print 'error' 'Stack is empty.' $debug
+        else
+
+            ##
+            # Print the array.
+            for cdc_history in ${CDC_HISTORY[@]}; do
+                printf "${cdc_history##*/} "
+            done
+            echo
+        fi
+
+        should_return=true
+    fi
+
+    if $cdc_current; then
+        ##
+        # If the stack is empty, tell the user and return.
+        if (( ${#CDC_HISTORY[@]} == 0 )); then
+            _cdc_print 'error' "Stack is empty." $debug
+            return 1
+        fi
+
+        ##
+        # cd to the root of the last repository in the history.
+        cd ${CDC_HISTORY[-1]}
+
+        should_return=true
+    fi
+
+    if $cdc_pop; then
+        ##
+        # If there aren't enough directories to pop, notify the user.
+        if (( ${#CDC_HISTORY[@]} == 0 )); then
+            _cdc_print 'error' 'Stack is empty.' $debug
+            return 1
+        elif (( ${#CDC_HISTORY[@]} == 1 )); then
+            _cdc_print 'error' 'At beginning of stack.' $debug
+            return 1
+        fi
+
+        ##
+        # Unset the last element of the array, then re-declare it.
+        # HACK: Again, this feels awful, but I can't get it to work for
+        # both bash and zsh unless I do something like this.
+        unset 'CDC_HISTORY[-1]'
+        CDC_HISTORY=(${CDC_HISTORY[@]})
+
+        ##
+        # cd to the previous diretory in the stack.
+        cd ${CDC_HISTORY[-1]}
+
+        should_return=true
+    fi
+
     ##
     # If we did an action that already caused us to `cd`, return.
-    if $did_cd; then
+    if $should_return; then
         return 0
     fi
 
@@ -349,8 +352,8 @@ cdc() {
     ##
     # Print usage and exit if the wrong number of arguments are passed.
     if (( $# != 1 )); then
-        __cdc_print 'error' 'USAGE: cdc [DIRECTORY]' $debug
-        __cdc_print 'error' '  Use `-h` for more help' $debug
+        _cdc_print 'error' 'USAGE: cdc [DIRECTORY]' $debug
+        _cdc_print 'error' '  Use `-h` for more help' $debug
         return 1
     fi
 
@@ -364,7 +367,7 @@ cdc() {
         # the array.
         if ! [[ -d $dir ]]; then
             if $debug; then
-                __cdc_print 'warn' \
+                _cdc_print 'warn' \
                     "$dir is in CDC_REPO_DIRS but isn't a directory." $debug
             fi
             continue
@@ -377,18 +380,18 @@ cdc() {
 
         ##
         # If the directory exists, but is excluded, skip it.
-        elif ! $allow_ignored && __cdc_is_excluded_dir "$cd_dir"; then
+        elif ! $allow_ignored && _cdc_is_excluded_dir "$cd_dir"; then
             if $debug; then
-                __cdc_print 'warn' 'Match was found but it is ignored.' $debug
+                _cdc_print 'warn' 'Match was found but it is ignored.' $debug
             fi
             continue
 
         ##
         # If the directory exists, but we're in repos-only mode and the
         # directory isn't a repo, skip it.
-        elif $repos_only && ! __cdc_is_repo_dir "$dir/$cd_dir"; then
+        elif $repos_only && ! _cdc_is_repo_dir "$dir/$cd_dir"; then
             if $debug; then
-                __cdc_print 'warn' \
+                _cdc_print 'warn' \
                     'Match was found but it is not a repository.' $debug
             fi
             continue
@@ -418,7 +421,7 @@ cdc() {
                 ##
                 # If it doesn't exist as a directory, print message to stderr.
                 if $debug; then
-                    __cdc_print 'warn' "$subdir does not exist in $cd_dir." \
+                    _cdc_print 'warn' "$subdir does not exist in $cd_dir." \
                         $debug
                 fi
             fi
@@ -436,7 +439,7 @@ cdc() {
     ##
     # If no directory was found (the argument wasn't in the array), print
     # message to stderr and return unsuccessful code.
-    __cdc_print 'error' "[$cd_dir] not found." $debug
+    _cdc_print 'error' "[$cd_dir] not found." $debug
 
     return 2
 }
@@ -446,7 +449,7 @@ cdc() {
 #
 # @param string $string
 # @return boolean
-__cdc_is_excluded_dir() {
+_cdc_is_excluded_dir() {
     local string="$1"
 
     ##
@@ -478,7 +481,7 @@ __cdc_is_excluded_dir() {
 #
 # @param string $string
 # @return array
-__cdc_repo_list() {
+_cdc_repo_list() {
     local dir
     local subdir
     local fulldir
@@ -493,7 +496,7 @@ __cdc_repo_list() {
         # If the element isn't a directory that exists, move on.
         if ! [[ -d $dir ]]; then
             if $debug; then
-                __cdc_print 'warn' \
+                _cdc_print 'warn' \
                     "$dir is in CDC_REPO_DIRS but isn't a directory."
             fi
             continue
@@ -513,13 +516,13 @@ __cdc_repo_list() {
 
             ##
             # If in repos-only mode, and directory isn't a repo, skip it.
-            if $CDC_REPOS_ONLY && ! __cdc_is_repo_dir "$fulldir"; then
+            if $CDC_REPOS_ONLY && ! _cdc_is_repo_dir "$fulldir"; then
                 continue
             fi
 
             ##
             # If the directory isn't excluded, add it to the array.
-            if ! __cdc_is_excluded_dir "$subdir"; then
+            if ! _cdc_is_excluded_dir "$subdir"; then
                 directories+=("$subdir")
             fi
         done
@@ -535,7 +538,7 @@ __cdc_repo_list() {
 #
 # @param string $dir
 # @return boolean
-__cdc_is_repo_dir() {
+_cdc_is_repo_dir() {
     local id
     local dir="$1"
 
@@ -566,7 +569,7 @@ __cdc_is_repo_dir() {
 # @param string $level
 # @param string $message
 # @return void
-__cdc_print() {
+_cdc_print() {
     local level="$1"
     local message="$2"
     local debug="$3"

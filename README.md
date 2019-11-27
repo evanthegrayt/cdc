@@ -212,7 +212,7 @@ overriding variables set in `~/.cdcrc`. There's also a debug mode.
 |-L|List the directories in which `cdc` will search.|
 |-i|List the directories that are to be ignored.|
 |-d|List directories in history stack. Similar to the `dirs` command.|
-|-c|`cd` to the current directory in the history stack.|
+|-n|`cd` to the current directory in the history stack.|
 |-t|Toggle to the last directory, similar to `cd -`. Rearranges history stack.|
 |-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
 |-u|Push the directory onto the stack. Similar to the `pushd` command.|
