@@ -208,6 +208,8 @@ overriding variables set in `~/.cdcrc`. There's also a debug mode.
 |Flag|What it does|
 |:------|:-----------|
 |-a|Allow the plugin to `cd` to ignored directories.|
+|-c|Enable colored output.|
+|-C|Disable colored output.|
 |-l|List all directories to which you can `cdc`. Same as tab-completion.|
 |-L|List the directories in which `cdc` will search.|
 |-i|List the directories that are to be ignored.|
