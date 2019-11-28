@@ -155,9 +155,9 @@ cdc() {
     ##
     # If colors are enabled, set color values if they're not already set.
     if $use_color; then
-        : ${CDC_ERROR_COLOR:='\e[0;91m'}
-        : ${CDC_SUCCESS_COLOR:='\e[0;92m'}
-        : ${CDC_WARNING_COLOR:='\e[0;93m'}
+        : ${CDC_ERROR_COLOR:='\e[0;31m'}
+        : ${CDC_SUCCESS_COLOR:='\e[0;32m'}
+        : ${CDC_WARNING_COLOR:='\e[0;33m'}
         CDC_RESET='\e[0m'
     ##
     # If colors are not enabled, unset the color variables.

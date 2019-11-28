@@ -178,9 +178,9 @@ adding the following lines to your `~/.cdcrc`.
 ```sh
 CDC_COLOR=false               # Default: true. Setting to false disables colors
 # The following lines would make the colored output bold.
-CDC_SUCCESS_COLOR='\e[1;92m'  # Bold green.   Default: '\e[0;92m' (green)
-CDC_WARNING_COLOR='\e[1;93m'  # Bold yellow.  Default: '\e[0;93m' (yellow)
-CDC_ERROR_COLOR='\e[1;91m'    # Bold red.     Default: '\e[0;91m' (red)
+CDC_SUCCESS_COLOR='\033[1;92m'  # Bold green.   Default: '\033[0;32m' (green)
+CDC_WARNING_COLOR='\033[1;93m'  # Bold yellow.  Default: '\033[0;33m' (yellow)
+CDC_ERROR_COLOR='\033[1;91m'    # Bold red.     Default: '\033[0;31m' (red)
 ```
 
 ## Usage
