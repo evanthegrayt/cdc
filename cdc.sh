@@ -24,20 +24,6 @@ cdc() {
     fi
 
     ##
-    # If colors are enabled, set color values if they're not already set.
-    # TODO Add flag to manipulate this setting.
-    if ${CDC_COLOR:=true}; then
-        : ${CDC_ERROR_COLOR:='\e[0;91m'}
-        : ${CDC_SUCCESS_COLOR:='\e[0;92m'}
-        : ${CDC_WARNING_COLOR:='\e[0;93m'}
-        CDC_RESET='\e[0m'
-    ##
-    # If colors are not enabled, unset the color variables.
-    else
-        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
-    fi
-
-    ##
     # Set local vars to avoid environment pollution.
     local dir
     local list
@@ -58,6 +44,8 @@ cdc() {
     local cdc_pop=false
     local cdc_show_history=false
     local cdc_list_ignored=false
+    local print_help=false
+    local use_color=${CDC_COLOR:-true}
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
@@ -88,12 +76,20 @@ cdc() {
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'aDdndhilLrRptuU' opt 2>/dev/null; do
+    while getopts 'acCDdndhilLrRptuU' opt 2>/dev/null; do
         case $opt in
 
             ##
             # -a: Allow cd-ing to ignored directories.
             a) allow_ignored=true ;;
+
+            ##
+            # -c: Enable color.
+            c) use_color=true ;;
+
+            ##
+            # -C: Disable color.
+            C) use_color=false ;;
 
             ##
             # -n: cd to the root of the current repository in the stack.
@@ -141,68 +137,11 @@ cdc() {
 
             ##
             # -D: Debug
-            D)
-                echo "========================= ENV ==========================="
-                printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
-                    "${CDC_DIRS[@]}"
-                printf "CDC_IGNORE       += ${CDC_WARNING_COLOR}%s$CDC_RESET\n"\
-                    "${CDC_IGNORE[@]}"
-                echo
-                printf "CDC_AUTO_PUSH     = %s\n" \
-                    $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
-                printf "CDC_REPOS_ONLY    = %s\n" \
-                    $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
-                printf "CDC_COLOR         = %s\n" \
-                    $( _cdc_print 'boolean' $CDC_COLOR )
-                echo
-                printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
-                    "$CDC_SUCCESS_COLOR"
-                printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
-                    "$CDC_WARNING_COLOR"
-                printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
-                    "$CDC_ERROR_COLOR"
-                echo "======================= RUNTIME ========================="
-                debug=true
-                ;;
+            D) debug=true ;;
 
             ##
             # -h: Print the help.
-            h)
-                printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
-                printf "${CDC_WARNING_COLOR}\n\n"
-                printf 'Options will always override variables set in ~/.cdcrc!'
-                printf "${CDC_RESET}\n"
-                printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
-                echo ' | `cd` to the directory even if it is ignored.'
-                printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
-                echo ' | List all directories that are cdc-able.'
-                printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
-                echo ' | List all directories in which to search.'
-                printf "  ${CDC_WARNING_COLOR}-i${CDC_RESET}"
-                echo ' | List all directories that are to be ignored.'
-                printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
-                echo ' | List the directories in stack.'
-                printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
-                echo ' | `cd` to the current directory in the stack.'
-                printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
-                echo ' | `cd` to previous directory and pop from the stack.'
-                printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
-                echo ' | Toggle between the last two directories in the stack.'
-                printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
-                echo ' | Push the directory onto the stack.'
-                printf "  ${CDC_WARNING_COLOR}-U${CDC_RESET}"
-                echo ' | Do not push the directory onto the stack'
-                printf "  ${CDC_WARNING_COLOR}-r${CDC_RESET}"
-                echo ' | 'Only cdc to repositories.
-                printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
-                echo ' | cd to any directory, even it is not a repository.'
-                printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
-                echo ' | Debug mode for when unexpected things are happening.'
-                printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
-                echo ' | Print this help.'
-
-                return 0
-                ;;
+            h) print_help=true ;;
 
             ##
             # If the option isn't supported, tell the user and exit.
@@ -212,6 +151,79 @@ cdc() {
                 ;;
         esac
     done
+
+    ##
+    # If colors are enabled, set color values if they're not already set.
+    if $use_color; then
+        : ${CDC_ERROR_COLOR:='\e[0;91m'}
+        : ${CDC_SUCCESS_COLOR:='\e[0;92m'}
+        : ${CDC_WARNING_COLOR:='\e[0;93m'}
+        CDC_RESET='\e[0m'
+    ##
+    # If colors are not enabled, unset the color variables.
+    else
+        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
+    fi
+
+    if $print_help; then
+        printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
+        printf "${CDC_WARNING_COLOR}\n\n"
+        printf 'Options will always override variables set in ~/.cdcrc!'
+        printf "${CDC_RESET}\n"
+        printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
+        echo ' | `cd` to the directory even if it is ignored.'
+        printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
+        echo ' | List all directories that are cdc-able.'
+        printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
+        echo ' | List all directories in which to search.'
+        printf "  ${CDC_WARNING_COLOR}-i${CDC_RESET}"
+        echo ' | List all directories that are to be ignored.'
+        printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
+        echo ' | List the directories in stack.'
+        printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
+        echo ' | `cd` to the current directory in the stack.'
+        printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
+        echo ' | `cd` to previous directory and pop from the stack.'
+        printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
+        echo ' | Toggle between the last two directories in the stack.'
+        printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
+        echo ' | Push the directory onto the stack.'
+        printf "  ${CDC_WARNING_COLOR}-U${CDC_RESET}"
+        echo ' | Do not push the directory onto the stack'
+        printf "  ${CDC_WARNING_COLOR}-r${CDC_RESET}"
+        echo ' | 'Only cdc to repositories.
+        printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
+        echo ' | cd to any directory, even it is not a repository.'
+        printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
+        echo ' | Debug mode for when unexpected things are happening.'
+        printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
+        echo ' | Print this help.'
+
+        return 0
+    fi
+
+    if $debug; then
+        echo "========================= ENV ==========================="
+        printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
+            "${CDC_DIRS[@]}"
+        printf "CDC_IGNORE       += ${CDC_WARNING_COLOR}%s$CDC_RESET\n"\
+            "${CDC_IGNORE[@]}"
+        echo
+        printf "CDC_AUTO_PUSH     = %s\n" \
+            $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
+        printf "CDC_REPOS_ONLY    = %s\n" \
+            $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
+        printf "CDC_COLOR         = %s\n" \
+            $( _cdc_print 'boolean' $CDC_COLOR )
+        echo
+        printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
+            "$CDC_SUCCESS_COLOR"
+        printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
+            "$CDC_WARNING_COLOR"
+        printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
+            "$CDC_ERROR_COLOR"
+        echo "======================= RUNTIME ========================="
+    fi
 
     if $cdc_list_searched_dirs; then
         if $debug; then
@@ -241,8 +253,7 @@ cdc() {
 
     if $cdc_toggle; then
         ##
-        # If the stack doesn't have at least two elements, tell the
-        # user and return.
+        # If the stack doesn't have at least two elements, tell the user.
         if (( ${#CDC_HISTORY[@]} < 2 )); then
             _cdc_print 'error' 'Not enough directories in the stack.' $debug
             (( rc++ ))
@@ -297,7 +308,7 @@ cdc() {
 
     if $cdc_show_history; then
         ##
-        # If the stack is empty, tell the user and return.
+        # If the stack is empty, tell the user.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
             _cdc_print 'error' 'Stack is empty.' $debug
             (( rc++ ))
@@ -320,7 +331,7 @@ cdc() {
 
     if $cdc_current; then
         ##
-        # If the stack is empty, tell the user and return.
+        # If the stack is empty, tell the user.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
             _cdc_print 'error' "Stack is empty." $debug
             (( rc++ ))
