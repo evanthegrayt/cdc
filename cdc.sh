@@ -1,4 +1,16 @@
 ##
+# The default files and directories that mark the root of a repository.
+# This is set before `~/.cdcrc` is sourced so the user can overwrite OR
+# append to it from their config file.
+CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
+
+##
+# Source the user's config file.
+if [[ -f $HOME/.cdcrc ]]; then
+    source $HOME/.cdcrc
+fi
+
+##
 # Set the array that will remember the history.
 CDC_HISTORY=()
 
@@ -13,8 +25,6 @@ CDC_HISTORY=()
 cdc() {
     ##
     # The default files and directories that mark the root of a repository.
-    # This is set before `~/.cdcrc` is sourced so the user can overwrite OR
-    # append to it from their config file.
     CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
 
     ##
@@ -206,7 +216,7 @@ cdc() {
         echo "========================= ENV ==========================="
         printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
             "${CDC_DIRS[@]}"
-        printf "CDC_IGNORE       += ${CDC_WARNING_COLOR}%s$CDC_RESET\n"\
+        printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
             "${CDC_IGNORE[@]}"
         echo
         printf "CDC_AUTO_PUSH     = %s\n" \
@@ -282,7 +292,6 @@ cdc() {
             ##
             # Finally, cd to the last directory in the stack.
             cd ${CDC_HISTORY[-1]}
-
         fi
 
         should_return=true
@@ -313,7 +322,6 @@ cdc() {
             _cdc_print 'error' 'Stack is empty.' $debug
             (( rc++ ))
         else
-
             if $debug; then
                 _cdc_print 'success' 'Listing directories in history.' $debug
             fi
@@ -487,7 +495,7 @@ cdc() {
 }
 
 ##
-# Returns "true" if argument is an element in $CDC_IGNORE.
+# Is the argument an element in $CDC_IGNORE?
 #
 # @param string $string
 # @return boolean
@@ -496,7 +504,7 @@ _cdc_is_excluded_dir() {
 
     ##
     # If $CDC_IGNORE isn't defined or is empty, return "false".
-    if ([[ -z $CDC_IGNORE ]] || (( ${#CDC_IGNORE[@]} == 0 ))); then
+    if [[ -z $CDC_IGNORE ]] || (( ${#CDC_IGNORE[@]} == 0 )); then
         return 1
     fi
 
@@ -518,8 +526,7 @@ _cdc_is_excluded_dir() {
 }
 
 ##
-# Completion function for the cdc plugin that lists repositories found in
-# $CDC_DIRS that aren't excluded.
+# Lists repositories found in $CDC_DIRS that aren't excluded.
 #
 # @param string $string
 # @return array
@@ -636,7 +643,7 @@ _cdc_print() {
             printf "${CDC_ERROR_COLOR}ERROR:${CDC_RESET} $message\n" >&2
             ;;
         ##
-        # Hijacking this method to also print our debug booleans.
+        # Hijacking this function to also print our debug booleans.
         'boolean')
             ##
             # If the variable is true, return with success color.
