@@ -178,7 +178,7 @@ cdc() {
     if $print_help; then
         printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
         printf "${CDC_WARNING_COLOR}\n\n"
-        printf 'Options will always override variables set in ~/.cdcrc!'
+        printf 'Flags will always override options set in ~/.cdcrc!'
         printf "${CDC_RESET}\n"
         printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
         echo ' | `cd` to the directory even if it is ignored.'
