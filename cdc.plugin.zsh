@@ -9,23 +9,24 @@ source "${0:h}/cdc.sh"
 # Add completion arguments.
 _cdc() {
   _arguments -s \
+    -D"[Debug mode for when unexpected things are happening.]" \
     - help \
     -h"[Print this help.]" \
-    - other \
-    -a"[cd to the directory even if it is ignored.]" \
+    - no_other_args \
+    -n"[cd to the current directory in the stack.]" \
+    -p"[cd to previous directory and pop from the stack]" \
+    -t"[Toggle between the last two directories in the stack.]" \
     -i"[List all directories that are to be ignored.]" \
     -l"[List all directories that are cdc-able.]" \
     -L"[List all directories in which to search.]" \
     -d"[List the directories in stack.]" \
-    -n"[cd to the current directory in the stack.]" \
-    -p"[cd to previous directory and pop from the stack]" \
-    -s"[Re-source the config file ('~/.cdcrc')]" \
-    -t"[Toggle between the last two directories in the stack.]" \
+    - allow_arg \
     -u"[Push the directory onto the stack.]" \
     -U"[Do not push the directory onto the stack.]" \
     -r"[Only cdc to repositories.]" \
     -R"[cd to any directory, even it is not a repository.]" \
-    -D"[Debug mode for when unexpected things are happening.]" \
+    -a"[cd to the directory even if it is ignored.]" \
+    -s"[Re-source the config file ('~/.cdcrc')]" \
     1::"[Directory to cd]:($(_cdc_repo_list))"
 }
 
