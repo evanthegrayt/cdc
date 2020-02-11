@@ -1,20 +1,4 @@
 ##
-# The default files and directories that mark the root of a repository.
-# This is set before `~/.cdcrc` is sourced so the user can overwrite OR
-# append to it from their config file.
-CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
-
-##
-# Source the user's config file.
-if [[ -f $HOME/.cdcrc ]]; then
-    source $HOME/.cdcrc
-fi
-
-##
-# Set the array that will remember the history.
-CDC_HISTORY=()
-
-##
 # The actual function that the user calls from the command line.
 # NOTE: I know this function is huge, and I hate it, but since this gets
 # sourced into interactive shells, I try to pollute the users' environments
@@ -23,14 +7,10 @@ CDC_HISTORY=()
 # @param string $cd_dir
 # @return void
 cdc() {
-    ##
-    # The default files and directories that mark the root of a repository.
-    CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
 
-    ##
-    # If $REPO_DIRS isn't set, and ~/.cdcrc exists, source it now.
-    if [[ -f $HOME/.cdcrc ]]; then
-        source $HOME/.cdcrc
+    if [[ ! -f ~/.cdcrc ]]; then
+        _cdc_print 'error' 'You must create a config file called ~/.cdcrc' true
+        return 1
     fi
 
     ##
@@ -55,6 +35,7 @@ cdc() {
     local cdc_show_history=false
     local cdc_list_ignored=false
     local print_help=false
+    local source_config_file=false
     local use_color=${CDC_COLOR:-true}
 
     ##
@@ -86,7 +67,7 @@ cdc() {
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCDdndhilLrRptuU' opt 2>/dev/null; do
+    while getopts 'acCDdndhilLrRsptuU' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -138,6 +119,10 @@ cdc() {
             R) repos_only=false ;;
 
             ##
+            # -s: Re-source ~/.cdcrc
+            s) source_config_file=true ;;
+
+            ##
             # -u: Push the directory onto the history stack.
             u) pushdir=true ;;
 
@@ -163,7 +148,16 @@ cdc() {
     done
 
     ##
+    # Shift out $OPTIND so we can accurately determine how many parameters (not
+    # options) were passed. Then, set cd_dir to $1.
+    shift $(( OPTIND - 1 ))
+    local cd_dir="${1%%/*}"
+
+    ##
     # If colors are enabled, set color values if they're not already set.
+    # TODO set a new color instead of unsetting the globals. When the globals
+    # are unset, we can't report what they're set to in the debug screen. Pass
+    # the variables to the _cdc_print function.
     if $use_color; then
         : ${CDC_ERROR_COLOR:='\e[0;31m'}
         : ${CDC_SUCCESS_COLOR:='\e[0;32m'}
@@ -173,6 +167,53 @@ cdc() {
     # If colors are not enabled, unset the color variables.
     else
         unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
+    fi
+
+    if $debug; then
+        echo "========================= ENV ==========================="
+        printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
+            "${CDC_DIRS[@]}"
+        printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
+            "${CDC_IGNORE[@]}"
+        echo
+        printf "CDC_AUTO_PUSH     = %s\n" \
+            $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
+        printf "CDC_REPOS_ONLY    = %s\n" \
+            $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
+        printf "CDC_COLOR         = %s\n" \
+            $( _cdc_print 'boolean' $CDC_COLOR )
+        echo
+        printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
+            "$CDC_SUCCESS_COLOR"
+        printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
+            "$CDC_WARNING_COLOR"
+        printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
+            "$CDC_ERROR_COLOR"
+        echo "======================= RUNTIME ========================="
+    fi
+
+    if $source_config_file; then
+        ##
+        # Reset all settings to their default values.
+        CDC_DIRS=()
+        CDC_IGNORE=()
+        CDC_REPOS_ONLY=false
+        CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
+        CDC_COLOR=true
+        CDC_AUTO_PUSH=true
+        CDC_ERROR_COLOR='\e[0;31m'
+        CDC_SUCCESS_COLOR='\e[0;32m'
+        CDC_WARNING_COLOR='\e[0;33m'
+
+        ##
+        # Source the config file.
+        source $HOME/.cdcrc
+        if $debug; then
+            _cdc_print 'success' 'Re-sourced config file (~/.cdcrc)' true
+        fi
+        if (( $# == 0 )); then
+            return 0
+        fi
     fi
 
     if $print_help; then
@@ -204,35 +245,14 @@ cdc() {
         echo ' | 'Only cdc to repositories.
         printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
         echo ' | cd to any directory, even it is not a repository.'
+        printf "  ${CDC_WARNING_COLOR}-s${CDC_RESET}"
+        echo ' | Re-source the config file (~/.cdcrc).'
         printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
         echo ' | Debug mode for when unexpected things are happening.'
         printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
         echo ' | Print this help.'
 
         return 0
-    fi
-
-    if $debug; then
-        echo "========================= ENV ==========================="
-        printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
-            "${CDC_DIRS[@]}"
-        printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
-            "${CDC_IGNORE[@]}"
-        echo
-        printf "CDC_AUTO_PUSH     = %s\n" \
-            $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
-        printf "CDC_REPOS_ONLY    = %s\n" \
-            $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
-        printf "CDC_COLOR         = %s\n" \
-            $( _cdc_print 'boolean' $CDC_COLOR )
-        echo
-        printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
-            "$CDC_SUCCESS_COLOR"
-        printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
-            "$CDC_WARNING_COLOR"
-        printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
-            "$CDC_ERROR_COLOR"
-        echo "======================= RUNTIME ========================="
     fi
 
     if $cdc_list_searched_dirs; then
@@ -392,12 +412,6 @@ cdc() {
     if $should_return; then
         return $rc
     fi
-
-    ##
-    # Shift out $OPTIND so we can accurately determine how many parameters (not
-    # options) were passed. Then, set cd_dir to $1.
-    shift $(( OPTIND - 1 ))
-    local cd_dir="${1%%/*}"
 
     ##
     # Print usage and exit if the wrong number of arguments are passed.
@@ -655,3 +669,20 @@ _cdc_print() {
             ;;
     esac
 }
+
+##
+# The default files and directories that mark the root of a repository.
+# This is set before `~/.cdcrc` is sourced so the user can overwrite OR
+# append to it from their config file.
+CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
+
+##
+# Source the user's config file.
+if [[ -f $HOME/.cdcrc ]]; then
+    source $HOME/.cdcrc
+fi
+
+##
+# Set the array that will remember the history.
+CDC_HISTORY=()
+

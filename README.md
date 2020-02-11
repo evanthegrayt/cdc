@@ -95,15 +95,10 @@ source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
 ```
 
 ## Set-up
-The following settings require variables to be set from either a file called
-`~/.cdcrc`, or a shell startup file such as `~/.zshrc` or `~/.bash_profile`. The
-following instructions will default to using `~/.cdcrc`, but just know that you
-have the other option. Just note, if you are going to put the variables in a
-startup file, set them *after* you source the plugin.
-
-Note that the `~/.cdcrc` file is just a shell script that sets values, so you
-can use `bash` conditionals if you'd like to use the same config file on
-multiple systems. You can view an example of this in [my config
+The following settings require variables to be set from a file called
+`~/.cdcrc`. Note that the `~/.cdcrc` file is just a shell script that sets
+values, so you can use `bash` conditionals if you'd like to use the same config
+file on multiple systems. You can view an example of this in [my config
 file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/cdcrc). Just
 remember, these files get sourced into your interactive shell on startup, so
 only use it to set the following values.
@@ -222,6 +217,7 @@ overriding variables set in `~/.cdcrc`. There's also a debug mode.
 |-U|Do not push the directory onto the stack.|
 |-r|Only `cd` to repositories.|
 |-R|`cd` to the directory even if it's not a repository.|
+|-s|Re-source the config file (`~/.cdcrc`)|
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
 |-h|Print help.|
 

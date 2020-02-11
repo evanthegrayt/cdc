@@ -19,6 +19,7 @@ _cdc() {
     -d"[List the directories in stack.]" \
     -n"[cd to the current directory in the stack.]" \
     -p"[cd to previous directory and pop from the stack]" \
+    -s"[Re-source the config file ('~/.cdcrc')]" \
     -t"[Toggle between the last two directories in the stack.]" \
     -u"[Push the directory onto the stack.]" \
     -U"[Do not push the directory onto the stack.]" \
@@ -31,4 +32,3 @@ _cdc() {
 ##
 # Define completions.
 compdef '_cdc' cdc
-
