@@ -3,7 +3,7 @@
 > `cdc` is the solution!
 
 ## Table of contents
-- [Rationale](#rationale)
+- [Overview and Rationale](#overview-and-rationale)
   - [Why the name "cdc"?](#why-the-name-cdc)
 - [Installation](#installation)
   - [Oh-My-Zsh](#oh-my-zsh)
@@ -20,7 +20,7 @@
 - [Reporting Bugs](#reporting-bugs)
 - [Self-Promotion](#self-promotion)
 
-## Rationale
+## Overview and Rationale
 I have a few directories in which I clone repositories. This function will
 change directory to the passed argument, no matter which of the
 repository-containing directories it's in. The plugin comes with tab-completion
