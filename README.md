@@ -1,4 +1,7 @@
-# cdc [directory]
+# cdc [repository]
+> If your repositories are spread throughout your system like a pandemic, then
+> `cdc` is the solution!
+
 ## Table of contents
 - [Rationale](#rationale)
   - [Why the name "cdc"?](#why-the-name-cdc)
