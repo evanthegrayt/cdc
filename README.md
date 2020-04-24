@@ -1,6 +1,7 @@
-# cdc [repository]
+# CDC
 > If your repositories are spread throughout your system like a pandemic, then
-> `cdc` is the solution!
+> `cdc` is the solution! Coincidentally, it's also what I say when people ask me
+> why I'm traveling to the coast. Ba-dum-tss.
 
 ## Table of contents
 - [Overview and Rationale](#overview-and-rationale)
