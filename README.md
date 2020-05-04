@@ -1,7 +1,9 @@
 # CDC
 > If your repositories are spread throughout your system like a pandemic, then
-> `cdc` is the solution! Coincidentally, it's also what I say when people ask me
-> why I'm traveling to the coast. Ba-dum-tss.
+> `cdc` is the solution!
+
+View on [GitHub](https://github.com/evanthegrayt/cdc) |
+[GitHub Pages](https://evanthegrayt.github.io/cdc/)
 
 ## Table of contents
 - [Overview and Rationale](#overview-and-rationale)
