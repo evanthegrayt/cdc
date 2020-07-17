@@ -41,16 +41,16 @@ It's worth noting that I chose to make this function rather than editing
 could just as easily do the
 following:
 ```sh
-# Assuming `other_repo` exists in `/path/to/repo_dir`
+# Assuming `repository` exists in `/path/to/repo_dir`
 CDPATH=/path/to/repo_dir
 
-cd other_repo # will cd to /path/to/repo_dir/other_repo
+cd repository # will cd to /path/to/repo_dir/repository
 ```
 
 Alternatively, you could make aliases:
 
 ```sh
-alias other_repo='cd /path/to/repo_dir/other_repo'
+alias repository='cd /path/to/repo_dir/repository'
 ```
 
 I don't like this method either, as it just pollutes your environment. In my
@@ -121,8 +121,8 @@ CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/another_dir_with_repos)
 Note that the order of the elements in the array matters. The plugin will `cd`
 to the first match it finds, so if you have the same repository -- or two
 repositories with the same name -- in two places, the first location in the
-array will take precedence. There is currently an issue to better handle this...
-feature. Not sure how I want to go about it yet. Suggestions are very much
+array will take precedence. There is currently an issue to better handle this
+"feature". Not sure how I want to go about it yet. Suggestions are very much
 welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
 
 ### Ignoring certain directories
