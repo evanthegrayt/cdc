@@ -1,4 +1,4 @@
-# CDC
+# $ cdc [dir]
 > If your repositories are spread throughout your system like a pandemic, then
 > `cdc` is the solution!
 

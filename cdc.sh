@@ -67,7 +67,7 @@ cdc() {
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCDdndhilLrRsptuU' opt 2>/dev/null; do
+    while getopts 'acCdDhilLnprRstuU' opt 2>/dev/null; do
         case $opt in
 
             ##
