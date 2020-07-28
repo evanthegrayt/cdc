@@ -5,25 +5,8 @@
 View on [GitHub](https://github.com/evanthegrayt/cdc) |
 [GitHub Pages](https://evanthegrayt.github.io/cdc/)
 
-## Table of contents
-- [Overview and Rationale](#overview-and-rationale)
-  - [Why the name "cdc"?](#why-the-name-cdc)
-- [Installation](#installation)
-  - [Oh-My-Zsh](#oh-my-zsh)
-  - [Bash-It](#bash-it)
-  - [Vanilla Zsh or Bash](#vanilla-zsh-or-bash)
-- [Set-up](#set-up)
-  - [Telling cdc where to look](#telling-cdc-where-to-look)
-  - [Ignoring certain directories](#ignoring-certain-directories)
-  - [Only recognize actual repositories](#only-recognize-actual-repositories)
-  - [Automatically pushing to the history stack](#automatically-pushing-to-the-history-stack)
-  - [Colored Output](#colored-output)
-- [Usage](#usage)
-  - [Options](#options)
-- [Reporting Bugs](#reporting-bugs)
-- [Self-Promotion](#self-promotion)
-
-## Overview and Rationale
+## About
+### Overview
 I have a few directories in which I clone repositories. This function will
 change directory to the passed argument, no matter which of the
 repository-containing directories it's in. The plugin comes with tab-completion
@@ -36,10 +19,11 @@ obviously use it for adding any directories to your `cd` path. In fact, this is
 the default behavior, but you *can* force `cdc` to only recognize repositories
 with a simple [configuration change](#only-recognize-actual-repositories).
 
-It's worth noting that I chose to make this function rather than editing
-`$CDPATH` because I don't like changing the default behavior of `cd`, but you
-could just as easily do the
+### Rationale
+I chose to make this function rather than editing `$CDPATH` because I don't like
+changing the default behavior of `cd`, but you could just as easily do the
 following:
+
 ```sh
 # Assuming `repository` exists in `/path/to/repo_dir`
 CDPATH=/path/to/repo_dir
