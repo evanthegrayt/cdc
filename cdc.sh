@@ -514,6 +514,7 @@ cdc() {
 # @param string $string
 # @return boolean
 _cdc_is_excluded_dir() {
+    local element
     local string="$1"
 
     ##
@@ -603,6 +604,7 @@ _cdc_repo_list() {
 # @return boolean
 _cdc_is_repo_dir() {
     local id
+    local marker
     local dir="$1"
 
     ##
