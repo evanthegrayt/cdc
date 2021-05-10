@@ -209,6 +209,7 @@ overriding variables set in `~/.cdcrc`. There's also a debug mode.
 |-R|`cd` to the directory even if it's not a repository.|
 |-s|Re-source the config file (`~/.cdcrc`)|
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
+|-w|Print the directory location instead of changing to it. Like `which`.|
 |-h|Print help.|
 
 ## Reporting bugs
