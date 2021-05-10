@@ -30,6 +30,7 @@ cdc() {
     local debug=false
     local should_return=false
     local allow_ignored=false
+    local which=false
     local cdc_current=false
     local cdc_pop=false
     local cdc_show_history=false
@@ -67,7 +68,7 @@ cdc() {
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCdDhilLnprRstuU' opt 2>/dev/null; do
+    while getopts 'acCdDhilLnprRstuUw' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -133,6 +134,10 @@ cdc() {
             ##
             # -D: Debug
             D) debug=true ;;
+
+            ##
+            # -w: Only display the repo's location, like which for executables.
+            w) which=true ;;
 
             ##
             # -h: Print the help.
@@ -249,6 +254,8 @@ cdc() {
         echo ' | Re-source the config file (~/.cdcrc).'
         printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
         echo ' | Debug mode for when unexpected things are happening.'
+        printf "  ${CDC_WARNING_COLOR}-w${CDC_RESET}"
+        echo ' | Print the directory location instead of changing to it.'
         printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
         echo ' | Print this help.'
 
@@ -492,8 +499,12 @@ cdc() {
         fi
 
         ##
-        # Finally, cd to the path.
-        cd "$wdir"
+        # Finally, cd to the path, or display it if $which is true.
+        if $which; then
+            echo $wdir
+        else
+            cd "$wdir"
+        fi
 
         ##
         # Return a successful code.
@@ -687,4 +698,3 @@ fi
 ##
 # Set the array that will remember the history.
 CDC_HISTORY=()
-
