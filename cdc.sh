@@ -18,6 +18,7 @@ cdc() {
     local dir
     local list
     local directory
+    local subdir
     local wdir
     local marker
     local cdc_last_element
@@ -33,6 +34,7 @@ cdc() {
     local which=false
     local cdc_current=false
     local cdc_pop=false
+    local cdc_git_status=false
     local cdc_show_history=false
     local cdc_list_ignored=false
     local print_help=false
@@ -55,7 +57,7 @@ cdc() {
     # If argument contains a slash, it's assumed to contain subdirectories.
     # This splits them into the directory root and its subdirectories.
     if [[ "$1" == */* ]]; then
-        local subdir="${1#*/}"
+        subdir="${1#*/}"
     fi
 
     ##
@@ -68,7 +70,7 @@ cdc() {
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCdDhilLnprRstuUw' opt 2>/dev/null; do
+    while getopts 'acCdDghilLnprRstuUw' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -82,6 +84,10 @@ cdc() {
             ##
             # -C: Disable color.
             C) use_color=false ;;
+
+            ##
+            # -g: Display git status for each repo.
+            g) cdc_git_status=true ;;
 
             ##
             # -n: cd to the root of the current repository in the stack.
@@ -236,6 +242,8 @@ cdc() {
         echo ' | List all directories that are to be ignored.'
         printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
         echo ' | List the directories in stack.'
+        printf "  ${CDC_WARNING_COLOR}-g${CDC_RESET}"
+        echo ' | Cycle through all repositories and print git status.'
         printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
         echo ' | `cd` to the current directory in the stack.'
         printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
@@ -260,6 +268,29 @@ cdc() {
         echo ' | Print this help.'
 
         return 0
+    fi
+
+    if $cdc_git_status; then
+        if $debug; then
+            _cdc_print 'success' 'Showing git status' $debug
+        fi
+        dir="$PWD"
+        for directory in "${CDC_DIRS[@]}"; do
+            [[ -d $directory ]] || continue
+            pushd "$directory" >/dev/null
+            for subdir in */; do
+                if ! $allow_ignored && _cdc_is_excluded_dir "$subdir"; then
+                    continue
+                fi
+                [[ -d $subdir/.git ]] || continue
+                printf "\n\n>> Checking status of [%s] <<\n" "$subdir"
+                pushd "$subdir" >/dev/null
+                git status
+                popd >/dev/null
+            done
+            popd >/dev/null
+        done
+        should_return=true
     fi
 
     if $cdc_list_searched_dirs; then

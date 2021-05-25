@@ -14,7 +14,8 @@ _cdc() {
     -h"[Print this help.]" \
     - no_other_args \
     -n"[cd to the current directory in the stack.]" \
-    -p"[cd to previous directory and pop from the stack]" \
+    -p"[cd to previous directory and pop from the stack.]" \
+    -g"[Cycle through all repositories and print git status.]" \
     -t"[Toggle between the last two directories in the stack.]" \
     -i"[List all directories that are to be ignored.]" \
     -l"[List all directories that are cdc-able.]" \
