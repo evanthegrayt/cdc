@@ -198,6 +198,7 @@ overriding variables set in `~/.cdcrc`. There's also a debug mode.
 |-C|Disable colored output.|
 |-l|List all directories to which you can `cdc`. Same as tab-completion.|
 |-L|List the directories in which `cdc` will search.|
+|-g|Cycle through all repositories and print the `git status`.|
 |-i|List the directories that are to be ignored.|
 |-d|List directories in history stack. Similar to the `dirs` command.|
 |-n|`cd` to the current directory in the history stack.|
