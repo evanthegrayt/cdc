@@ -46,8 +46,8 @@ cdc() {
     local repos_only=${CDC_REPOS_ONLY:-false}
 
     ##
-    # In an interactive bash shell, you have to reset OPTIND each time, or
-    # getopts only works the first time you use them for a function call.
+    # When using getopts in a function, you must declare OPTIND as a local
+    # variable, or it will only work the first time you call it.
     local OPTIND
 
     ##
