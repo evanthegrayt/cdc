@@ -7,12 +7,14 @@ View on [GitHub](https://github.com/evanthegrayt/cdc) |
 
 ## About
 ### Overview
-I have a few directories in which I clone repositories. This function will
-change directory to the passed argument, no matter which of the
-repository-containing directories it's in. The plugin comes with tab-completion
-for its arguments, as long as your `zsh`/`bash` version supports it. The plugin
-also includes session history, and has options available that behave similar to
-the `pushd`, `popd`, and `dirs` commands.
+I have a few directories in which I clone repositories, so hopping from one
+project to another can be tedious. This plugin provides a way to change
+directory to any repository, regardless of where it's located, with `cdc
+[REPOSITORY]`. The only setup necessary is to specify which paths the plugin
+should check for the repository. The plugin comes with tab-completion, as long
+as your `zsh`/`bash` version supports it. The plugin also includes session
+history, and has options available that behave similar to the `pushd`, `popd`,
+and `dirs` commands.
 
 While this plugin was written for directories that contain repositories, you can
 obviously use it for adding any directories to your `cd` path. In fact, this is
