@@ -54,7 +54,7 @@ cdc() {
     # NOTE: Experimental feature.
     # If argument contains a slash, it's assumed to contain subdirectories.
     # This splits them into the directory root and its subdirectories.
-    if [[ "$1" == */* ]]; then
+    if [[ $1 == */* ]]; then
         local subdir="${1#*/}"
     fi
 
@@ -541,7 +541,7 @@ _cdc_is_excluded_dir() {
         ##
         # If the element matches the passed string, return "true" to indicate
         # it's excluded.
-        if [[ "${element/\//}" == "${string/\//}" ]]; then
+        if [[ ${element/\//} == ${string/\//} ]]; then
             return 0
         fi
     done
