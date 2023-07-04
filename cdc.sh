@@ -164,10 +164,10 @@ cdc() {
     # are unset, we can't report what they're set to in the debug screen. Pass
     # the variables to the _cdc_print function.
     if $use_color; then
-        : ${CDC_ERROR_COLOR:='\e[0;31m'}
-        : ${CDC_SUCCESS_COLOR:='\e[0;32m'}
-        : ${CDC_WARNING_COLOR:='\e[0;33m'}
-        CDC_RESET='\e[0m'
+        : ${CDC_ERROR_COLOR:='\033[0;31m'}
+        : ${CDC_SUCCESS_COLOR:='\033[0;32m'}
+        : ${CDC_WARNING_COLOR:='\033[0;33m'}
+        CDC_RESET='\033[0m'
     ##
     # If colors are not enabled, unset the color variables.
     else
