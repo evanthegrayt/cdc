@@ -1,11 +1,11 @@
 ##
 # The file to be sourced if you're using bash and want tab-completion.
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+CDC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 ##
 # Source the plugin and completion functions.
-source $DIR/cdc.sh
-unset DIR
+source $CDC_DIR/cdc.sh
+unset CDC_DIR
 
 ##
 # Bash-it plugin citations.
