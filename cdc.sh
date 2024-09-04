@@ -451,7 +451,7 @@ cdc() {
 
         ##
         # If the directory exists, but is excluded, skip it.
-        elif ! $allow_ignored && _cdc_is_excluded_dir "$cd_dir"; then
+        elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$cd_dir"; then
             if [[ $debug == true ]]; then
                 _cdc_print 'warn' 'Match was found but it is ignored.' $debug
             fi
@@ -652,7 +652,7 @@ _cdc_print() {
 
     ##
     # If we're not debugging, just print the message and return.
-    if ! $debug; then
+    if [[ $debug == false ]]; then
         echo $message
         return
     fi
