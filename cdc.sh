@@ -163,7 +163,7 @@ cdc() {
     # TODO set a new color instead of unsetting the globals. When the globals
     # are unset, we can't report what they're set to in the debug screen. Pass
     # the variables to the _cdc_print function.
-    if $use_color; then
+    if [[ $use_color == true ]]; then
         : ${CDC_ERROR_COLOR:='\033[0;31m'}
         : ${CDC_SUCCESS_COLOR:='\033[0;32m'}
         : ${CDC_WARNING_COLOR:='\033[0;33m'}
@@ -174,7 +174,7 @@ cdc() {
         unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
     fi
 
-    if $debug; then
+    if [[ $debug == true ]]; then
         echo "========================= ENV ==========================="
         printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
             "${CDC_DIRS[@]}"
@@ -197,7 +197,7 @@ cdc() {
         echo "======================= RUNTIME ========================="
     fi
 
-    if $source_config_file; then
+    if [[ $source_config_file == true ]]; then
         ##
         # Reset all settings to their default values.
         CDC_DIRS=()
@@ -213,7 +213,7 @@ cdc() {
         ##
         # Source the config file.
         source $HOME/.cdcrc
-        if $debug; then
+        if [[ $debug == true ]]; then
             _cdc_print 'success' 'Re-sourced config file (~/.cdcrc)' true
         fi
         if (( $# == 0 )); then
@@ -221,7 +221,7 @@ cdc() {
         fi
     fi
 
-    if $print_help; then
+    if [[ $print_help == true ]]; then
         printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
         printf "${CDC_WARNING_COLOR}\n\n"
         printf 'Flags will always override options set in ~/.cdcrc!'
@@ -262,16 +262,16 @@ cdc() {
         return 0
     fi
 
-    if $cdc_list_searched_dirs; then
-        if $debug; then
+    if [[ $cdc_list_searched_dirs == true ]]; then
+        if [[ $debug == true ]]; then
             _cdc_print 'success' 'Listing searched directories.' $debug
         fi
         printf "%s\n" "${CDC_DIRS[@]}" | column
         should_return=true
     fi
 
-    if $cdc_list_dirs; then
-        if $debug; then
+    if [[ $cdc_list_dirs == true ]]; then
+        if [[ $debug == true ]]; then
             _cdc_print 'success' 'Listing available directories.' $debug
         fi
         ##
@@ -288,14 +288,14 @@ cdc() {
         should_return=true
     fi
 
-    if $cdc_toggle; then
+    if [[ $cdc_toggle == true ]]; then
         ##
         # If the stack doesn't have at least two elements, tell the user.
         if (( ${#CDC_HISTORY[@]} < 2 )); then
             _cdc_print 'error' 'Not enough directories in the stack.' $debug
             (( rc++ ))
         else
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'success' 'Toggling between last two directories.' \
                     $debug
             fi
@@ -324,15 +324,15 @@ cdc() {
         should_return=true
     fi
 
-    if $cdc_list_ignored; then
+    if [[ $cdc_list_ignored == true ]]; then
         ##
         # If the ignore array is empty, return.
         if (( ${#CDC_IGNORE[@]} == 0 )); then
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'warn' 'No directories are being ignored.' $debug
             fi
         else
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'success' 'Listing ignored directories.' $debug
             fi
 
@@ -342,14 +342,14 @@ cdc() {
         should_return=true
     fi
 
-    if $cdc_show_history; then
+    if [[ $cdc_show_history == true ]]; then
         ##
         # If the stack is empty, tell the user.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
             _cdc_print 'error' 'Stack is empty.' $debug
             (( rc++ ))
         else
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'success' 'Listing directories in history.' $debug
             fi
 
@@ -364,14 +364,14 @@ cdc() {
         should_return=true
     fi
 
-    if $cdc_current; then
+    if [[ $cdc_current == true ]]; then
         ##
         # If the stack is empty, tell the user.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
             _cdc_print 'error' "Stack is empty." $debug
             (( rc++ ))
         else
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'success' \
                     'Changing to current directory in history.' $debug
             fi
@@ -384,7 +384,7 @@ cdc() {
         should_return=true
     fi
 
-    if $cdc_pop; then
+    if [[ $cdc_pop == true ]]; then
         ##
         # If there aren't enough directories to pop, notify the user.
         if (( ${#CDC_HISTORY[@]} == 0 )); then
@@ -394,7 +394,7 @@ cdc() {
             _cdc_print 'error' 'At beginning of stack.' $debug
             (( rc++ ))
         else
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'success' 'Changing to last directory in history.' \
                     $debug
             fi
@@ -416,7 +416,7 @@ cdc() {
 
     ##
     # If we did an action that already caused us to `cd`, return.
-    if $should_return; then
+    if [[ $should_return == true ]]; then
         return $rc
     fi
 
@@ -437,7 +437,7 @@ cdc() {
         # exist, print a message to stderr and move on to the next directory in
         # the array.
         if ! [[ -d $dir ]]; then
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'warn' \
                     "$dir is in CDC_REPO_DIRS but isn't a directory." $debug
             fi
@@ -452,7 +452,7 @@ cdc() {
         ##
         # If the directory exists, but is excluded, skip it.
         elif ! $allow_ignored && _cdc_is_excluded_dir "$cd_dir"; then
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'warn' 'Match was found but it is ignored.' $debug
             fi
             continue
@@ -460,8 +460,8 @@ cdc() {
         ##
         # If the directory exists, but we're in repos-only mode and the
         # directory isn't a repo, skip it.
-        elif $repos_only && ! _cdc_is_repo_dir "$dir/$cd_dir"; then
-            if $debug; then
+        elif [[ $repos_only == true ]] && ! _cdc_is_repo_dir "$dir/$cd_dir"; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'warn' \
                     'Match was found but it is not a repository.' $debug
             fi
@@ -475,7 +475,7 @@ cdc() {
 
         ##
         # If pushdir is true, add the directory to the history stack.
-        if $pushdir; then
+        if [[ $pushdir == true ]]; then
             CDC_HISTORY+=("$wdir")
         fi
 
@@ -491,7 +491,7 @@ cdc() {
 
                 ##
                 # If it doesn't exist as a directory, print message to stderr.
-                if $debug; then
+                if [[ $debug == true ]]; then
                     _cdc_print 'warn' "$subdir does not exist in $cd_dir." \
                         $debug
                 fi
@@ -500,7 +500,7 @@ cdc() {
 
         ##
         # Finally, cd to the path, or display it if $which is true.
-        if $which; then
+        if [[ $which == true ]]; then
             echo $wdir
         else
             cd "$wdir"
@@ -570,7 +570,7 @@ _cdc_repo_list() {
         ##
         # If the element isn't a directory that exists, move on.
         if ! [[ -d $dir ]]; then
-            if $debug; then
+            if [[ $debug == true ]]; then
                 _cdc_print 'warn' \
                     "$dir is in CDC_REPO_DIRS but isn't a directory."
             fi
@@ -591,7 +591,7 @@ _cdc_repo_list() {
 
             ##
             # If in repos-only mode, and directory isn't a repo, skip it.
-            if $CDC_REPOS_ONLY && ! _cdc_is_repo_dir "$fulldir"; then
+            if [[ $CDC_REPOS_ONLY == true ]] && ! _cdc_is_repo_dir "$fulldir"; then
                 continue
             fi
 
@@ -674,7 +674,7 @@ _cdc_print() {
         'boolean')
             ##
             # If the variable is true, return with success color.
-            if $message; then
+            if [[ $message == true ]]; then
                 printf "${CDC_SUCCESS_COLOR}true$CDC_RESET"
             else
                 printf "${CDC_ERROR_COLOR}false$CDC_RESET"
