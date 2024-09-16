@@ -8,11 +8,6 @@
 # @return void
 cdc() {
 
-    if [[ ! -f ~/.cdcrc ]]; then
-        _cdc_print 'error' 'You must create a config file called ~/.cdcrc' true
-        return 1
-    fi
-
     ##
     # Set local vars to avoid environment pollution.
     local dir
@@ -59,16 +54,8 @@ cdc() {
     fi
 
     ##
-    # Check for the existence of required variables that should be set in
-    # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
-    if (( ${#CDC_DIRS[@]} == 0 )); then
-        _cdc_error 'You must set CDC_DIRS in a ~/.cdcrc file. See README.md.'
-        return 1
-    fi
-
-    ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCdDhilLnprRstuUw' opt 2>/dev/null; do
+    while getopts 'acCdDhilLnprRtuUw' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -118,10 +105,6 @@ cdc() {
             ##
             # -R: Force cdc to NOT only cd to repositories.
             R) repos_only=false ;;
-
-            ##
-            # -s: Re-source ~/.cdcrc
-            s) source_config_file=true ;;
 
             ##
             # -u: Push the directory onto the history stack.
@@ -197,28 +180,12 @@ cdc() {
         echo "======================= RUNTIME ========================="
     fi
 
-    if [[ $source_config_file == true ]]; then
-        ##
-        # Reset all settings to their default values.
-        CDC_DIRS=()
-        CDC_IGNORE=()
-        CDC_REPOS_ONLY=false
-        CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
-        CDC_COLOR=true
-        CDC_AUTO_PUSH=true
-        CDC_ERROR_COLOR='\e[0;31m'
-        CDC_SUCCESS_COLOR='\e[0;32m'
-        CDC_WARNING_COLOR='\e[0;33m'
-
-        ##
-        # Source the config file.
-        source $HOME/.cdcrc
-        if [[ $debug == true ]]; then
-            _cdc_print 'success' 'Re-sourced config file (~/.cdcrc)' true
-        fi
-        if (( $# == 0 )); then
-            return 0
-        fi
+    ##
+    # Check for the existence of required variables that should be set in
+    # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
+    if (( ${#CDC_DIRS[@]} == 0 )); then
+        _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
+        return 1
     fi
 
     if [[ $print_help == true ]]; then
@@ -228,6 +195,10 @@ cdc() {
         printf "${CDC_RESET}\n"
         printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
         echo ' | `cd` to the directory even if it is ignored.'
+        printf "  ${CDC_WARNING_COLOR}-c${CDC_RESET}"
+        echo ' | Enable colored output'
+        printf "  ${CDC_WARNING_COLOR}-C${CDC_RESET}"
+        echo ' | Disable colored output'
         printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
         echo ' | List all directories that are cdc-able.'
         printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
@@ -250,8 +221,6 @@ cdc() {
         echo ' | 'Only cdc to repositories.
         printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
         echo ' | cd to any directory, even it is not a repository.'
-        printf "  ${CDC_WARNING_COLOR}-s${CDC_RESET}"
-        echo ' | Re-source the config file (~/.cdcrc).'
         printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
         echo ' | Debug mode for when unexpected things are happening.'
         printf "  ${CDC_WARNING_COLOR}-w${CDC_RESET}"
