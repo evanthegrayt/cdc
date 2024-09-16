@@ -26,7 +26,6 @@ _cdc() {
     -r"[Only cdc to repositories.]" \
     -R"[cd to any directory, even it is not a repository.]" \
     -a"[cd to the directory even if it is ignored.]" \
-    -s"[Re-source the config file ('~/.cdcrc')]" \
     -w"[Print directory location instead of changing to it]" \
     1::"[Directory to cd]:($(_cdc_repo_list))"
 }
