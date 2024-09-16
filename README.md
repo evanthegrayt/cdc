@@ -87,59 +87,51 @@ source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
 ```
 
 ## Set-up
-The following settings require variables to be set from a file called
-`~/.cdcrc`. Note that the `~/.cdcrc` file is just a shell script that sets
-values, so you can use `bash` conditionals if you'd like to use the same config
-file on multiple systems. You can view an example of this in [my config
-file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/cdcrc). Just
-remember, these files get sourced into your interactive shell on startup, so
-only use it to set the following values.
+The following settings require variables to be set from a startup file, such as
+`~/.zshrc` or `~/.bashrc`.  You can view an example of this in [my config
+file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/shellrc#L27).
 
 ### Telling cdc where to look
-To use this plugin, you need to set `CDC_DIRS` in `~/.cdcrc`. It should be an
-array with absolute paths to the directories to search.
+To use this plugin, you need to `export CDC_DIRS` in a startup file. It should
+be a string with absolute paths to the directories to search, separated by
+colons (similar to `$PATH`).
 
 ```sh
-# Set this in ~/.cdcrc
-CDC_DIRS=($HOME/dir_with_repos $HOME/workspace/another_dir_with_repos)
+# Set this in ~/.zshrc or similar
+export CDC_DIRS=$HOME/dir_with_repos:$HOME/workspace/another_dir_with_repos
 ```
 
-Note that the order of the elements in the array matters. The plugin will `cd`
+Note that the order of the paths in the string matters. The plugin will `cd`
 to the first match it finds, so if you have the same repository -- or two
 repositories with the same name -- in two places, the first location in the
-array will take precedence. There is currently an issue to better handle this
+string will take precedence. There is currently an issue to better handle this
 "feature". Not sure how I want to go about it yet. Suggestions are very much
 welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
 
 ### Ignoring certain directories
 If you have directories within `CDC_DIRS` that you want the plugin to ignore,
-you can set `CDC_IGNORE` to an array containing those directories. These
+you can `export CDC_IGNORE` to a string containing those directories. These
 elements should only be the directory base-name, **not** the absolute path.
 "Ignoring" a directory will prevent it from being "seen" by `cdc`.
 
 ```sh
 # Assuming you never want to `cdc notes_directory`:
-CDC_IGNORE=(notes_directory)
+export CDC_IGNORE=notes_directory:training
 ```
 
 ### Only recognize actual repositories
-You can set `CDC_REPOS_ONLY` in `~/.cdcrc` to make `cdc` only recognize
+You can `export CDC_REPOS_ONLY` in a startup file to make `cdc` only recognize
 repositories as directories. This is **disabled by default**. You can also set
-an array of files and directories that mark what you consider a repository. Note
-that markers that are directories must end with a `/`, while files must not.
+a string of files and directories that mark what you consider a repository.
+Note that markers that are directories must end with a `/`, while files must
+not.
 
 ```sh
 # Enable "repos-only" mode. Note, the default is false.
-CDC_REPOS_ONLY=true
+export CDC_REPOS_ONLY=true
 # Set repository markers with the following. Note, the following is already the
-# default, but this is how you can overwrite it in ~/.cdcrc.
-CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
-```
-If you want to add markers to the existing array without overwriting it, you
-can use `+=` when assigning it.
-
-```sh
-CDC_REPO_MARKERS+=(.example_directory_marker/ .example_file_marker)
+# default, but this is how you can overwrite it in ~/.zshrc or similar.
+export CDC_REPO_MARKERS=.git/:.git:Rakefile:Makefile:.hg/:.bzr/:.svn/
 ```
 
 Note that this setting can be overridden with the `-r` and `-R` options. See
@@ -147,12 +139,12 @@ Note that this setting can be overridden with the `-r` and `-R` options. See
 
 ### Automatically pushing to the history stack
 By default, every `cdc` call will push the directory onto the history stack. You
-can disable this feature by setting `CDC_AUTO_PUSH` to `false` in your
-`~/.cdcrc`.
+can disable this feature by setting `CDC_AUTO_PUSH` to `false` in a startup
+file.
 
 ```sh
 # Disable auto-pushing to history stack.
-CDC_AUTO_PUSH=false
+export CDC_AUTO_PUSH=false
 ```
 
 You can then manually push directories onto the stack with `-u`. If you have
@@ -161,14 +153,14 @@ it to the stack with the `-U` option. See [options](#options) below.
 
 ### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
-adding the following lines to your `~/.cdcrc`.
+adding the following lines to a startup file.
 
 ```sh
-CDC_COLOR=false               # Default: true. Setting to false disables colors
+export CDC_COLOR=false               # Default: true. Setting to false disables colors
 # The following lines would make the colored output bold.
-CDC_SUCCESS_COLOR='\033[1;92m'  # Bold green.   Default: '\033[0;32m' (green)
-CDC_WARNING_COLOR='\033[1;93m'  # Bold yellow.  Default: '\033[0;33m' (yellow)
-CDC_ERROR_COLOR='\033[1;91m'    # Bold red.     Default: '\033[0;31m' (red)
+export CDC_SUCCESS_COLOR='\033[1;92m'  # Bold green.   Default: '\033[0;32m' (green)
+export CDC_WARNING_COLOR='\033[1;93m'  # Bold yellow.  Default: '\033[0;33m' (yellow)
+export CDC_ERROR_COLOR='\033[1;91m'    # Bold red.     Default: '\033[0;31m' (red)
 ```
 
 ## Usage
@@ -191,7 +183,7 @@ print a message to `stderr`.
 ### Options
 The plugin comes with a few available options. Some are for dealing with the
 directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
-overriding variables set in `~/.cdcrc`. There's also a debug mode.
+overriding variables set in a startup file. There's also a debug mode.
 
 |Flag|What it does|
 |:------|:-----------|
@@ -209,7 +201,6 @@ overriding variables set in `~/.cdcrc`. There's also a debug mode.
 |-U|Do not push the directory onto the stack.|
 |-r|Only `cd` to repositories.|
 |-R|`cd` to the directory even if it's not a repository.|
-|-s|Re-source the config file (`~/.cdcrc`)|
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
 |-w|Print the directory location instead of changing to it. Like `which`.|
 |-h|Print help.|
