@@ -7,12 +7,6 @@
 # @param string $cd_dir
 # @return void
 cdc() {
-
-    if [[ ! -f ~/.cdcrc ]]; then
-        _cdc_print 'error' 'You must create a config file called ~/.cdcrc' true
-        return 1
-    fi
-
     ##
     # Set local vars to avoid environment pollution.
     local dir
@@ -38,6 +32,8 @@ cdc() {
     local print_help=false
     local source_config_file=false
     local use_color=${CDC_COLOR:-true}
+    local cdc_dirs=($( printf "%s\n" "${CDC_DIRS//:/ }" ))
+    local cdc_ignore=($( printf "%s\n" "${CDC_IGNORE//:/ }" ))
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
@@ -59,16 +55,8 @@ cdc() {
     fi
 
     ##
-    # Check for the existence of required variables that should be set in
-    # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
-    if (( ${#CDC_DIRS[@]} == 0 )); then
-        _cdc_error 'You must set CDC_DIRS in a ~/.cdcrc file. See README.md.'
-        return 1
-    fi
-
-    ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCdDhilLnprRstuUw' opt 2>/dev/null; do
+    while getopts 'acCdDhilLnprRtuUw' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -118,10 +106,6 @@ cdc() {
             ##
             # -R: Force cdc to NOT only cd to repositories.
             R) repos_only=false ;;
-
-            ##
-            # -s: Re-source ~/.cdcrc
-            s) source_config_file=true ;;
 
             ##
             # -u: Push the directory onto the history stack.
@@ -177,9 +161,9 @@ cdc() {
     if [[ $debug == true ]]; then
         echo "========================= ENV ==========================="
         printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
-            "${CDC_DIRS[@]}"
+            "${cdc_dirs[@]}"
         printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
-            "${CDC_IGNORE[@]}"
+            "${cdc_ignore[@]}"
         echo
         printf "CDC_AUTO_PUSH     = %s\n" \
             $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
@@ -197,28 +181,12 @@ cdc() {
         echo "======================= RUNTIME ========================="
     fi
 
-    if [[ $source_config_file == true ]]; then
-        ##
-        # Reset all settings to their default values.
-        CDC_DIRS=()
-        CDC_IGNORE=()
-        CDC_REPOS_ONLY=false
-        CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
-        CDC_COLOR=true
-        CDC_AUTO_PUSH=true
-        CDC_ERROR_COLOR='\e[0;31m'
-        CDC_SUCCESS_COLOR='\e[0;32m'
-        CDC_WARNING_COLOR='\e[0;33m'
-
-        ##
-        # Source the config file.
-        source $HOME/.cdcrc
-        if [[ $debug == true ]]; then
-            _cdc_print 'success' 'Re-sourced config file (~/.cdcrc)' true
-        fi
-        if (( $# == 0 )); then
-            return 0
-        fi
+    ##
+    # Check for the existence of required variables that should be set in
+    # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
+    if (( ${#cdc_dirs[@]} == 0 )); then
+        _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
+        return 1
     fi
 
     if [[ $print_help == true ]]; then
@@ -228,6 +196,10 @@ cdc() {
         printf "${CDC_RESET}\n"
         printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
         echo ' | `cd` to the directory even if it is ignored.'
+        printf "  ${CDC_WARNING_COLOR}-c${CDC_RESET}"
+        echo ' | Enable colored output'
+        printf "  ${CDC_WARNING_COLOR}-C${CDC_RESET}"
+        echo ' | Disable colored output'
         printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
         echo ' | List all directories that are cdc-able.'
         printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
@@ -250,8 +222,6 @@ cdc() {
         echo ' | 'Only cdc to repositories.
         printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
         echo ' | cd to any directory, even it is not a repository.'
-        printf "  ${CDC_WARNING_COLOR}-s${CDC_RESET}"
-        echo ' | Re-source the config file (~/.cdcrc).'
         printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
         echo ' | Debug mode for when unexpected things are happening.'
         printf "  ${CDC_WARNING_COLOR}-w${CDC_RESET}"
@@ -266,7 +236,7 @@ cdc() {
         if [[ $debug == true ]]; then
             _cdc_print 'success' 'Listing searched directories.' $debug
         fi
-        printf "%s\n" "${CDC_DIRS[@]}" | column
+        printf "%s\n" "${cdc_dirs[@]}" | column
         should_return=true
     fi
 
@@ -327,7 +297,7 @@ cdc() {
     if [[ $cdc_list_ignored == true ]]; then
         ##
         # If the ignore array is empty, return.
-        if (( ${#CDC_IGNORE[@]} == 0 )); then
+        if (( ${#cdc_ignore[@]} == 0 )); then
             if [[ $debug == true ]]; then
                 _cdc_print 'warn' 'No directories are being ignored.' $debug
             fi
@@ -336,7 +306,7 @@ cdc() {
                 _cdc_print 'success' 'Listing ignored directories.' $debug
             fi
 
-            printf "%s\n" "${CDC_IGNORE[@]}" | column
+            printf "%s\n" "${cdc_ignore[@]}" | column
         fi
 
         should_return=true
@@ -429,11 +399,11 @@ cdc() {
     fi
 
     ##
-    # Loop through every element in $CDC_DIRS.
-    for dir in ${CDC_DIRS[@]}; do
+    # Loop through every element in $cdc_dirs.
+    for dir in ${cdc_dirs[@]}; do
 
         ##
-        # If a directory is in the $CDC_DIRS array, but the directory doesn't
+        # If a directory is in the $cdc_dirs array, but the directory doesn't
         # exist, print a message to stderr and move on to the next directory in
         # the array.
         if ! [[ -d $dir ]]; then
@@ -527,16 +497,17 @@ cdc() {
 _cdc_is_excluded_dir() {
     local element
     local string="$1"
+    local cdc_ignore=($( printf "%s\n" "${CDC_IGNORE//:/ }" ))
 
     ##
-    # If $CDC_IGNORE isn't defined or is empty, return "false".
-    if [[ -z $CDC_IGNORE ]] || (( ${#CDC_IGNORE[@]} == 0 )); then
+    # If $cdc_ignore isn't defined or is empty, return "false".
+    if [[ -z $cdc_ignore ]] || (( ${#cdc_ignore[@]} == 0 )); then
         return 1
     fi
 
     ##
     # Loop through each element of $CDC_IGNORE array.
-    for element in "${CDC_IGNORE[@]}"; do
+    for element in "${cdc_ignore[@]}"; do
 
         ##
         # If the element matches the passed string, return "true" to indicate
@@ -552,7 +523,7 @@ _cdc_is_excluded_dir() {
 }
 
 ##
-# Lists repositories found in $CDC_DIRS that aren't excluded.
+# Lists repositories found in $cdc_dirs that aren't excluded.
 #
 # @param string $string
 # @return array
@@ -562,10 +533,11 @@ _cdc_repo_list() {
     local fulldir
     local directories=()
     local debug=${1:-false}
+    local cdc_dirs=($( printf "%s\n" "${CDC_DIRS//:/ }" ))
 
     ##
-    # Loop through all elements of $CDC_DIRS array.
-    for dir in "${CDC_DIRS[@]}"; do
+    # Loop through all elements of $cdc_dirs array.
+    for dir in "${cdc_dirs[@]}"; do
 
         ##
         # If the element isn't a directory that exists, move on.
@@ -617,10 +589,18 @@ _cdc_is_repo_dir() {
     local id
     local marker
     local dir="$1"
+    local repo_markers
+
+    if [[ -n $CDC_REPO_MARKERS ]]; then
+        repo_markers=($( printf "%s\n" "${CDC_REPO_MARKERS//:/ }" ))
+    else
+        repo_markers=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
+    fi
+
 
     ##
     # Spin through all known repository markers.
-    for marker in ${CDC_REPO_MARKERS[@]}; do
+    for marker in ${repo_markers[@]}; do
 
         ##
         # Repo identifier is the passed directory plus the known marker.
@@ -684,17 +664,13 @@ _cdc_print() {
 }
 
 ##
-# The default files and directories that mark the root of a repository.
-# This is set before `~/.cdcrc` is sourced so the user can overwrite OR
-# append to it from their config file.
-CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
-
-##
 # Source the user's config file.
 if [[ -f $HOME/.cdcrc ]]; then
+    _cdc_print 'warn' "Using ~/.cdcrc is deprecated and will be removed " \
+        "in a future version.\nPlease set values in a config file instead."
     source $HOME/.cdcrc
 fi
 
 ##
-# Set the array that will remember the history.
+# Set the array that will remember the history. Needs to persist.
 CDC_HISTORY=()
