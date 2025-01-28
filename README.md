@@ -23,8 +23,8 @@ export CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
 ...they should now look like this -- a string separated by colons, like `$PATH`:
 
 ```sh
-export CDC_DIRS="/home/user/one:/home/user/two"
-export CDC_IGNORE="notes_directory:training"
+export CDC_DIRS=/home/user/one:/home/user/two
+export CDC_IGNORE=notes_directory:training
 export CDC_REPO_MARKERS=.git/:.git:Rakefile:Makefile:.hg/:.bzr/:.svn/
 ```
 
