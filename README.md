@@ -10,13 +10,14 @@ Note that `cdc` was recently updated with breaking changes. If you're
 experiencing issues, please check [this section](#telling-cdc-where-to-look) of
 the docs, and ensure you're declaring your variables correctly.
 
-In short, the `CDC_DIRS` and `CDC_IGNORE` used to be declared as arrays, but you
-can't export environmental variables as arrays; they must be a string. So if
-your variables looked like this:
+In short, the `CDC_DIRS`, `CDC_IGNORE`, and `CDC_REPO_MARKERS` used to be
+declared as arrays, but you can't export environmental variables as arrays; they
+must be a string. So if your variables looked like this:
 
 ```sh
 export CDC_DIRS=(/home/user/one /home/user/two)
 export CDC_IGNORE=(notes_directory training)
+export CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
 ```
 
 ...they should now look like this -- a string separated by colons, like `$PATH`:
@@ -24,6 +25,7 @@ export CDC_IGNORE=(notes_directory training)
 ```sh
 export CDC_DIRS="/home/user/one:/home/user/two"
 export CDC_IGNORE="notes_directory:training"
+export CDC_REPO_MARKERS=.git/:.git:Rakefile:Makefile:.hg/:.bzr/:.svn/
 ```
 
 ## About
