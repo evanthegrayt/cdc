@@ -63,7 +63,7 @@ alias repository='cd /path/to/repo_dir/repository'
 ```
 
 I don't like this method either, as it just pollutes your environment. In my
-opinion, the less aliases, the better. Also, you now have to remember an alias
+opinion, the fewer aliases, the better. Also, you now have to remember an alias
 for each repository. `cdc` solves this issue with its tab-completion.
 
 ### Why the name "cdc"?
