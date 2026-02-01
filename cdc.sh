@@ -46,6 +46,12 @@ cdc() {
     # variable, or it will only work the first time you call it.
     local OPTIND
 
+    if [[ -f $HOME/.cdcrc ]]; then
+        _cdc_print 'error' \
+            "File ~/.cdcrc is no longer used. Delete it and export variables from a startup file (~/.bashrc, ~/.zshrc, etc.)"
+        return 1
+    fi
+
     ##
     # NOTE: Experimental feature.
     # If argument contains a slash, it's assumed to contain subdirectories.
