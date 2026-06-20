@@ -159,6 +159,16 @@ setup() {
     assert_output_contains "custom"
 }
 
+@test "help output includes option descriptions" {
+    run cdc -h
+
+    assert_success
+    assert_output_contains "-P"
+    assert_output_contains "cd to a configured parent directory"
+    assert_output_contains "-R"
+    assert_output_contains "cd to any directory, even if it is not a repository"
+}
+
 @test "cdc requires CDC_DIRS" {
     unset CDC_DIRS
 

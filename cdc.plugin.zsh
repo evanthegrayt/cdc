@@ -11,30 +11,8 @@ _cdc_complete_options() {
   local -a options
   local -a descriptions
 
-  options=(
-    -a -c -C -D -d -h -i -L -l -n -p -P -R -r -t -U -u -w
-  )
-
-  descriptions=(
-    '-a  cd to the directory even if it is ignored'
-    '-c  Enable colored output'
-    '-C  Disable colored output'
-    '-D  Enable debug mode for unexpected behavior'
-    '-d  List the directories in the stack'
-    '-h  Print this help'
-    '-i  List ignored directories'
-    '-L  List directories that cdc searches'
-    '-l  List cdc-able directories'
-    '-n  cd to the current directory in the stack'
-    '-p  cd to the previous directory and pop it from the stack'
-    '-P  cd to a configured parent directory'
-    '-R  cd to any directory, even if it is not a repository'
-    '-r  Only cd to repositories'
-    '-t  Toggle between the last two directories in the stack'
-    '-U  Do not push the directory onto the stack'
-    '-u  Push the directory onto the stack'
-    '-w  Print the directory location instead of changing to it'
-  )
+  options=("${(@f)$(_cdc_completion_all_options)}")
+  descriptions=("${(@f)$(_cdc_completion_option_descriptions)}")
 
   compadd -d descriptions -- "${options[@]}"
 }
