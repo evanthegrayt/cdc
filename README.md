@@ -161,9 +161,9 @@ Note that this setting can be overridden with the `-r` and `-R` options. See
 [options](#options) below.
 
 ### Automatically pushing to the history stack
-By default, every `cdc` call will push the directory onto the history stack. You
-can disable this feature by setting `CDC_AUTO_PUSH` to `false` in a startup
-file.
+By default, every `cdc` call that changes directories will push the directory
+onto the history stack. You can disable this feature by setting `CDC_AUTO_PUSH`
+to `false` in a startup file.
 
 ```sh
 # Disable auto-pushing to history stack.
@@ -173,6 +173,8 @@ export CDC_AUTO_PUSH=false
 You can then manually push directories onto the stack with `-u`. If you have
 `CDC_AUTO_PUSH` set to `true`, you can still `cdc` to a directory and not push
 it to the stack with the `-U` option. See [options](#options) below.
+Using `-w` only prints a directory path and does not push anything onto the
+history stack.
 
 ### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
@@ -227,6 +229,14 @@ overriding variables set in a startup file. There's also a debug mode.
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
 |-w|Print the directory location instead of changing to it. Like `which`.|
 |-h|Print help.|
+
+## Tests
+The test suite uses [bats-core](https://github.com/bats-core/bats-core). Tests
+create their own temporary fixtures and shell configuration.
+
+```sh
+./test/run.sh
+```
 
 ## Reporting bugs
 If you have an idea or find a bug, please [create an

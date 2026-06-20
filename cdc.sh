@@ -1,22 +1,14 @@
 ##
-# The actual function that the user calls from the command line.
-# NOTE: I know this function is huge, and I hate it, but since this gets
-# sourced into interactive shells, I try to pollute the users' environments
-# with helper functions as little as possible.
+# The public function that the user calls from the command line.
+# Helper functions are namespaced with `_cdc_` because this file is sourced into
+# interactive shells.
 #
 # @param string $cd_dir
 # @return void
 cdc() {
     ##
     # Set local vars to avoid environment pollution.
-    local dir
-    local list
-    local directory
     local wdir
-    local marker
-    local cdc_last_element
-    local cdc_next_to_last_element
-    local cdc_history
     local rc=0
     local cdc_list_dirs=false
     local cdc_list_searched_dirs=false
@@ -30,10 +22,8 @@ cdc() {
     local cdc_show_history=false
     local cdc_list_ignored=false
     local print_help=false
-    local source_config_file=false
     local use_color=${CDC_COLOR:-true}
-    local cdc_dirs=($( printf "%s\n" "${CDC_DIRS//:/ }" ))
-    local cdc_ignore=($( printf "%s\n" "${CDC_IGNORE//:/ }" ))
+    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
@@ -153,245 +143,62 @@ cdc() {
     # TODO set a new color instead of unsetting the globals. When the globals
     # are unset, we can't report what they're set to in the debug screen. Pass
     # the variables to the _cdc_print function.
-    if [[ $use_color == true ]]; then
-        : ${CDC_ERROR_COLOR:='\033[0;31m'}
-        : ${CDC_SUCCESS_COLOR:='\033[0;32m'}
-        : ${CDC_WARNING_COLOR:='\033[0;33m'}
-        CDC_RESET='\033[0m'
-    ##
-    # If colors are not enabled, unset the color variables.
-    else
-        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
-    fi
+    _cdc_apply_color_config "$use_color"
 
     if [[ $debug == true ]]; then
-        echo "========================= ENV ==========================="
-        printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
-            "${cdc_dirs[@]}"
-        printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
-            "${cdc_ignore[@]}"
-        echo
-        printf "CDC_AUTO_PUSH     = %s\n" \
-            $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
-        printf "CDC_REPOS_ONLY    = %s\n" \
-            $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
-        printf "CDC_COLOR         = %s\n" \
-            $( _cdc_print 'boolean' $CDC_COLOR )
-        echo
-        printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
-            "$CDC_SUCCESS_COLOR"
-        printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
-            "$CDC_WARNING_COLOR"
-        printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
-            "$CDC_ERROR_COLOR"
-        echo "======================= RUNTIME ========================="
+        _cdc_print_debug_env
     fi
 
     ##
-    # Check for the existence of required variables that should be set in
-    # ~/.cdcrc or a startup file. If not found, exit with non-zero return code.
+    # Check for the existence of required variables that should be set in a
+    # startup file. If not found, exit with non-zero return code.
     if (( ${#cdc_dirs[@]} == 0 )); then
         _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
         return 1
     fi
 
     if [[ $print_help == true ]]; then
-        printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
-        printf "${CDC_WARNING_COLOR}\n\n"
-        printf 'Flags will always override options set in ~/.cdcrc!'
-        printf "${CDC_RESET}\n"
-        printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
-        echo ' | `cd` to the directory even if it is ignored.'
-        printf "  ${CDC_WARNING_COLOR}-c${CDC_RESET}"
-        echo ' | Enable colored output'
-        printf "  ${CDC_WARNING_COLOR}-C${CDC_RESET}"
-        echo ' | Disable colored output'
-        printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
-        echo ' | List all directories that are cdc-able.'
-        printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
-        echo ' | List all directories in which to search.'
-        printf "  ${CDC_WARNING_COLOR}-i${CDC_RESET}"
-        echo ' | List all directories that are to be ignored.'
-        printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
-        echo ' | List the directories in stack.'
-        printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
-        echo ' | `cd` to the current directory in the stack.'
-        printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
-        echo ' | `cd` to previous directory and pop from the stack.'
-        printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
-        echo ' | Toggle between the last two directories in the stack.'
-        printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
-        echo ' | Push the directory onto the stack.'
-        printf "  ${CDC_WARNING_COLOR}-U${CDC_RESET}"
-        echo ' | Do not push the directory onto the stack'
-        printf "  ${CDC_WARNING_COLOR}-r${CDC_RESET}"
-        echo ' | 'Only cdc to repositories.
-        printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
-        echo ' | cd to any directory, even it is not a repository.'
-        printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
-        echo ' | Debug mode for when unexpected things are happening.'
-        printf "  ${CDC_WARNING_COLOR}-w${CDC_RESET}"
-        echo ' | Print the directory location instead of changing to it.'
-        printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
-        echo ' | Print this help.'
-
+        _cdc_print_help
         return 0
     fi
 
     if [[ $cdc_list_searched_dirs == true ]]; then
-        if [[ $debug == true ]]; then
-            _cdc_print 'success' 'Listing searched directories.' $debug
-        fi
-        printf "%s\n" "${cdc_dirs[@]}" | column
+        _cdc_list_searched_dirs "$debug"
         should_return=true
     fi
 
     if [[ $cdc_list_dirs == true ]]; then
-        if [[ $debug == true ]]; then
-            _cdc_print 'success' 'Listing available directories.' $debug
-        fi
-        ##
-        # Get the list of directories.
-        list=($( _cdc_repo_list $debug ))
-
-        ##
-        # Print the list and pipe to column for nice output. Also pad
-        # each element to make them all at least 8 characters long.
-        # This is done because column has issues printing strings less
-        # than 8 bytes.
-        printf "%-8s\n" "${list[@]}" | column
-
+        _cdc_list_available_dirs "$debug"
         should_return=true
     fi
 
     if [[ $cdc_toggle == true ]]; then
-        ##
-        # If the stack doesn't have at least two elements, tell the user.
-        if (( ${#CDC_HISTORY[@]} < 2 )); then
-            _cdc_print 'error' 'Not enough directories in the stack.' $debug
-            (( rc++ ))
-        else
-            if [[ $debug == true ]]; then
-                _cdc_print 'success' 'Toggling between last two directories.' \
-                    $debug
-            fi
-
-            ##
-            # Flip the last two elements of the array.
-            # HACK: When you unset an element in an array, it still exists; it's
-            # just null, so you have to re-declare the array. If anyone knows a
-            # better way, please let me know.
-            cdc_last_element=${CDC_HISTORY[-1]}
-            cdc_next_to_last_element=${CDC_HISTORY[-2]}
-            unset 'CDC_HISTORY[-1]'
-            CDC_HISTORY=(${CDC_HISTORY[@]})
-            unset 'CDC_HISTORY[-1]'
-            CDC_HISTORY=(
-                ${CDC_HISTORY[@]}
-                $cdc_last_element
-                $cdc_next_to_last_element
-            )
-
-            ##
-            # Finally, cd to the last directory in the stack.
-            cd ${CDC_HISTORY[-1]}
-        fi
-
+        _cdc_history_toggle "$debug" || (( rc++ ))
         should_return=true
     fi
 
     if [[ $cdc_list_ignored == true ]]; then
-        ##
-        # If the ignore array is empty, return.
-        if (( ${#cdc_ignore[@]} == 0 )); then
-            if [[ $debug == true ]]; then
-                _cdc_print 'warn' 'No directories are being ignored.' $debug
-            fi
-        else
-            if [[ $debug == true ]]; then
-                _cdc_print 'success' 'Listing ignored directories.' $debug
-            fi
-
-            printf "%s\n" "${cdc_ignore[@]}" | column
-        fi
-
+        _cdc_list_ignored_dirs "$debug"
         should_return=true
     fi
 
     if [[ $cdc_show_history == true ]]; then
-        ##
-        # If the stack is empty, tell the user.
-        if (( ${#CDC_HISTORY[@]} == 0 )); then
-            _cdc_print 'error' 'Stack is empty.' $debug
-            (( rc++ ))
-        else
-            if [[ $debug == true ]]; then
-                _cdc_print 'success' 'Listing directories in history.' $debug
-            fi
-
-            ##
-            # Print the array.
-            for cdc_history in ${CDC_HISTORY[@]}; do
-                printf "${cdc_history##*/} "
-            done
-            echo
-        fi
-
+        _cdc_history_list "$debug" || (( rc++ ))
         should_return=true
     fi
 
     if [[ $cdc_current == true ]]; then
-        ##
-        # If the stack is empty, tell the user.
-        if (( ${#CDC_HISTORY[@]} == 0 )); then
-            _cdc_print 'error' "Stack is empty." $debug
-            (( rc++ ))
-        else
-            if [[ $debug == true ]]; then
-                _cdc_print 'success' \
-                    'Changing to current directory in history.' $debug
-            fi
-
-            ##
-            # cd to the root of the last repository in the history.
-            cd ${CDC_HISTORY[-1]}
-        fi
-
+        _cdc_history_current "$debug" || (( rc++ ))
         should_return=true
     fi
 
     if [[ $cdc_pop == true ]]; then
-        ##
-        # If there aren't enough directories to pop, notify the user.
-        if (( ${#CDC_HISTORY[@]} == 0 )); then
-            _cdc_print 'error' 'Stack is empty.' $debug
-            (( rc++ ))
-        elif (( ${#CDC_HISTORY[@]} == 1 )); then
-            _cdc_print 'error' 'At beginning of stack.' $debug
-            (( rc++ ))
-        else
-            if [[ $debug == true ]]; then
-                _cdc_print 'success' 'Changing to last directory in history.' \
-                    $debug
-            fi
-
-            ##
-            # Unset the last element of the array, then re-declare it.
-            # HACK: Again, this feels awful, but I can't get it to work for
-            # both bash and zsh unless I do something like this.
-            unset 'CDC_HISTORY[-1]'
-            CDC_HISTORY=(${CDC_HISTORY[@]})
-
-            ##
-            # cd to the previous diretory in the stack.
-            cd ${CDC_HISTORY[-1]}
-        fi
-
+        _cdc_history_pop "$debug" || (( rc++ ))
         should_return=true
     fi
 
     ##
-    # If we did an action that already caused us to `cd`, return.
+    # If we handled an option-only action above, return.
     if [[ $should_return == true ]]; then
         return $rc
     fi
@@ -404,6 +211,393 @@ cdc() {
         return 1
     fi
 
+    wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" "$debug")
+    if (( $? == 0 )); then
+        ##
+        # If pushdir is true and we're changing directories, add the directory
+        # to the history stack.
+        if [[ $pushdir == true && $which != true ]]; then
+            CDC_HISTORY+=("$wdir")
+        fi
+
+        wdir=$(_cdc_resolve_subdir "$wdir" "$cd_dir" "$subdir" "$debug")
+
+        ##
+        # Finally, cd to the path, or display it if $which is true.
+        if [[ $which == true ]]; then
+            echo $wdir
+        else
+            cd "$wdir"
+        fi
+
+        ##
+        # Return a successful code.
+        return 0
+    fi
+
+    ##
+    # If no directory was found (the argument wasn't in the array), print
+    # message to stderr and return unsuccessful code.
+    _cdc_print 'error' "[$cd_dir] not found." $debug
+
+    return 2
+}
+
+##
+# Split a colon-delimited string into shell words.
+#
+# @param string $string
+# @return array
+_cdc_parse_colon_string() {
+    printf "%s\n" "${1//:/ }"
+}
+
+##
+# Configure color variables used by the printer.
+#
+# @param boolean $use_color
+# @return void
+_cdc_apply_color_config() {
+    local use_color="$1"
+
+    if [[ $use_color == true ]]; then
+        : ${CDC_ERROR_COLOR:='\033[0;31m'}
+        : ${CDC_SUCCESS_COLOR:='\033[0;32m'}
+        : ${CDC_WARNING_COLOR:='\033[0;33m'}
+        CDC_RESET='\033[0m'
+    ##
+    # If colors are not enabled, unset the color variables.
+    else
+        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
+    fi
+}
+
+##
+# Print the debug environment report.
+#
+# @return void
+_cdc_print_debug_env() {
+    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
+    local cdc_ignore=($( _cdc_parse_colon_string "$CDC_IGNORE" ))
+
+    echo "========================= ENV ==========================="
+    printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
+        "${cdc_dirs[@]}"
+    printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
+        "${cdc_ignore[@]}"
+    echo
+    printf "CDC_AUTO_PUSH     = %s\n" \
+        $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
+    printf "CDC_REPOS_ONLY    = %s\n" \
+        $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
+    printf "CDC_COLOR         = %s\n" \
+        $( _cdc_print 'boolean' $CDC_COLOR )
+    echo
+    printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
+        "$CDC_SUCCESS_COLOR"
+    printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
+        "$CDC_WARNING_COLOR"
+    printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
+        "$CDC_ERROR_COLOR"
+    echo "======================= RUNTIME ========================="
+}
+
+##
+# Print cdc help.
+#
+# @return void
+_cdc_print_help() {
+    printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
+    printf "${CDC_WARNING_COLOR}\n\n"
+    printf 'Flags will always override options set in startup files!'
+    printf "${CDC_RESET}\n"
+    printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
+    echo ' | `cd` to the directory even if it is ignored.'
+    printf "  ${CDC_WARNING_COLOR}-c${CDC_RESET}"
+    echo ' | Enable colored output'
+    printf "  ${CDC_WARNING_COLOR}-C${CDC_RESET}"
+    echo ' | Disable colored output'
+    printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
+    echo ' | List all directories that are cdc-able.'
+    printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
+    echo ' | List all directories in which to search.'
+    printf "  ${CDC_WARNING_COLOR}-i${CDC_RESET}"
+    echo ' | List all directories that are to be ignored.'
+    printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
+    echo ' | List the directories in stack.'
+    printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
+    echo ' | `cd` to the current directory in the stack.'
+    printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
+    echo ' | `cd` to previous directory and pop from the stack.'
+    printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
+    echo ' | Toggle between the last two directories in the stack.'
+    printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
+    echo ' | Push the directory onto the stack.'
+    printf "  ${CDC_WARNING_COLOR}-U${CDC_RESET}"
+    echo ' | Do not push the directory onto the stack'
+    printf "  ${CDC_WARNING_COLOR}-r${CDC_RESET}"
+    echo ' | Only cdc to repositories.'
+    printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
+    echo ' | cd to any directory, even it is not a repository.'
+    printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
+    echo ' | Debug mode for when unexpected things are happening.'
+    printf "  ${CDC_WARNING_COLOR}-w${CDC_RESET}"
+    echo ' | Print the directory location instead of changing to it.'
+    printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
+    echo ' | Print this help.'
+}
+
+##
+# List the directories cdc searches.
+#
+# @param boolean $debug
+# @return void
+_cdc_list_searched_dirs() {
+    local debug="$1"
+    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Listing searched directories.' $debug
+    fi
+
+    printf "%s\n" "${cdc_dirs[@]}" | column
+}
+
+##
+# List the directories cdc can change to.
+#
+# @param boolean $debug
+# @return void
+_cdc_list_available_dirs() {
+    local debug="$1"
+    local list
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Listing available directories.' $debug
+    fi
+
+    ##
+    # Get the list of directories.
+    list=($( _cdc_repo_list $debug ))
+
+    ##
+    # Print the list and pipe to column for nice output. Also pad each element
+    # to make them all at least 8 characters long. This is done because column
+    # has issues printing strings less than 8 bytes.
+    printf "%-8s\n" "${list[@]}" | column
+}
+
+##
+# List the directories cdc ignores.
+#
+# @param boolean $debug
+# @return void
+_cdc_list_ignored_dirs() {
+    local debug="$1"
+    local cdc_ignore=($( _cdc_parse_colon_string "$CDC_IGNORE" ))
+
+    ##
+    # If the ignore array is empty, return.
+    if (( ${#cdc_ignore[@]} == 0 )); then
+        if [[ $debug == true ]]; then
+            _cdc_print 'warn' 'No directories are being ignored.' $debug
+        fi
+    else
+        if [[ $debug == true ]]; then
+            _cdc_print 'success' 'Listing ignored directories.' $debug
+        fi
+
+        printf "%s\n" "${cdc_ignore[@]}" | column
+    fi
+}
+
+##
+# Toggle between the last two directories in the history stack.
+#
+# @param boolean $debug
+# @return boolean
+_cdc_history_toggle() {
+    local debug="$1"
+    local cdc_last_element
+    local cdc_next_to_last_element
+    local cdc_last_index
+    local cdc_next_to_last_index
+
+    ##
+    # If the stack doesn't have at least two elements, tell the user.
+    if (( ${#CDC_HISTORY[@]} < 2 )); then
+        _cdc_print 'error' 'Not enough directories in the stack.' $debug
+        return 1
+    fi
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Toggling between last two directories.' $debug
+    fi
+
+    ##
+    # Flip the last two elements of the array.
+    # HACK: When you unset an element in an array, it still exists; it's just
+    # null, so you have to re-declare the array.
+    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
+    cdc_next_to_last_index=$(_cdc_array_next_to_last_index "${#CDC_HISTORY[@]}")
+    cdc_last_element=${CDC_HISTORY[$cdc_last_index]}
+    cdc_next_to_last_element=${CDC_HISTORY[$cdc_next_to_last_index]}
+    unset "CDC_HISTORY[$cdc_last_index]"
+    CDC_HISTORY=(${CDC_HISTORY[@]})
+    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
+    unset "CDC_HISTORY[$cdc_last_index]"
+    CDC_HISTORY=(
+        ${CDC_HISTORY[@]}
+        $cdc_last_element
+        $cdc_next_to_last_element
+    )
+
+    ##
+    # Finally, cd to the last directory in the stack.
+    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
+    cd ${CDC_HISTORY[$cdc_last_index]}
+    return 0
+}
+
+##
+# List cdc history.
+#
+# @param boolean $debug
+# @return boolean
+_cdc_history_list() {
+    local debug="$1"
+    local cdc_history
+
+    ##
+    # If the stack is empty, tell the user.
+    if (( ${#CDC_HISTORY[@]} == 0 )); then
+        _cdc_print 'error' 'Stack is empty.' $debug
+        return 1
+    fi
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Listing directories in history.' $debug
+    fi
+
+    ##
+    # Print the array.
+    for cdc_history in ${CDC_HISTORY[@]}; do
+        printf "${cdc_history##*/} "
+    done
+    echo
+}
+
+##
+# Change to the current directory in history.
+#
+# @param boolean $debug
+# @return boolean
+_cdc_history_current() {
+    local debug="$1"
+    local cdc_last_index
+
+    ##
+    # If the stack is empty, tell the user.
+    if (( ${#CDC_HISTORY[@]} == 0 )); then
+        _cdc_print 'error' "Stack is empty." $debug
+        return 1
+    fi
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Changing to current directory in history.' $debug
+    fi
+
+    ##
+    # cd to the root of the last repository in the history.
+    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
+    cd ${CDC_HISTORY[$cdc_last_index]}
+    return 0
+}
+
+##
+# Change to the previous directory in history.
+#
+# @param boolean $debug
+# @return boolean
+_cdc_history_pop() {
+    local debug="$1"
+    local cdc_last_index
+
+    ##
+    # If there aren't enough directories to pop, notify the user.
+    if (( ${#CDC_HISTORY[@]} == 0 )); then
+        _cdc_print 'error' 'Stack is empty.' $debug
+        return 1
+    elif (( ${#CDC_HISTORY[@]} == 1 )); then
+        _cdc_print 'error' 'At beginning of stack.' $debug
+        return 1
+    fi
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Changing to last directory in history.' $debug
+    fi
+
+    ##
+    # Unset the last element of the array, then re-declare it.
+    # HACK: Again, this feels awful, but I can't get it to work for both bash
+    # and zsh unless I do something like this.
+    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
+    unset "CDC_HISTORY[$cdc_last_index]"
+    CDC_HISTORY=(${CDC_HISTORY[@]})
+
+    ##
+    # cd to the previous directory in the stack.
+    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
+    cd ${CDC_HISTORY[$cdc_last_index]}
+    return 0
+}
+
+##
+# Get the last index for a shell array of the given size.
+#
+# @param integer $array_size
+# @return integer
+_cdc_array_last_index() {
+    local array_size="$1"
+
+    if [[ -n $ZSH_VERSION ]]; then
+        echo "$array_size"
+    else
+        echo $(( array_size - 1 ))
+    fi
+}
+
+##
+# Get the next-to-last index for a shell array of the given size.
+#
+# @param integer $array_size
+# @return integer
+_cdc_array_next_to_last_index() {
+    local array_size="$1"
+
+    if [[ -n $ZSH_VERSION ]]; then
+        echo $(( array_size - 1 ))
+    else
+        echo $(( array_size - 2 ))
+    fi
+}
+
+##
+# Find the matching directory for the requested directory name.
+#
+# @param string $cd_dir
+# @param boolean $allow_ignored
+# @param boolean $repos_only
+# @param boolean $debug
+# @return string
+_cdc_find_dir() {
+    local cd_dir="$1"
+    local allow_ignored="$2"
+    local repos_only="$3"
+    local debug="$4"
+    local dir
+    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
+
     ##
     # Loop through every element in $cdc_dirs.
     for dir in ${cdc_dirs[@]}; do
@@ -415,7 +609,7 @@ cdc() {
         if ! [[ -d $dir ]]; then
             if [[ $debug == true ]]; then
                 _cdc_print 'warn' \
-                    "$dir is in CDC_REPO_DIRS but isn't a directory." $debug
+                    "$dir is in CDC_DIRS but isn't a directory." $debug
             fi
             continue
         fi
@@ -446,53 +640,47 @@ cdc() {
 
         ##
         # By this point, the parameter obviously exists as a valid directory,
-        # so we save it to a variable.
-        wdir="$dir/$cd_dir"
-
-        ##
-        # If pushdir is true, add the directory to the history stack.
-        if [[ $pushdir == true ]]; then
-            CDC_HISTORY+=("$wdir")
-        fi
-
-        ##
-        # If the user passed a subdirectory (if the argument had a slash in it).
-        if [[ -n $subdir ]]; then
-
-            ##
-            # If it exists as a directory, append it to the path.
-            if [[ -d $wdir/$subdir ]]; then
-                wdir+="/$subdir"
-            else
-
-                ##
-                # If it doesn't exist as a directory, print message to stderr.
-                if [[ $debug == true ]]; then
-                    _cdc_print 'warn' "$subdir does not exist in $cd_dir." \
-                        $debug
-                fi
-            fi
-        fi
-
-        ##
-        # Finally, cd to the path, or display it if $which is true.
-        if [[ $which == true ]]; then
-            echo $wdir
-        else
-            cd "$wdir"
-        fi
-
-        ##
-        # Return a successful code.
+        # so we print it for the caller.
+        echo "$dir/$cd_dir"
         return 0
     done
 
-    ##
-    # If no directory was found (the argument wasn't in the array), print
-    # message to stderr and return unsuccessful code.
-    _cdc_print 'error' "[$cd_dir] not found." $debug
-
     return 2
+}
+
+##
+# Append a requested subdirectory if it exists.
+#
+# @param string $wdir
+# @param string $cd_dir
+# @param string $subdir
+# @param boolean $debug
+# @return string
+_cdc_resolve_subdir() {
+    local wdir="$1"
+    local cd_dir="$2"
+    local subdir="$3"
+    local debug="$4"
+
+    ##
+    # If the user passed a subdirectory (if the argument had a slash in it).
+    if [[ -n $subdir ]]; then
+
+        ##
+        # If it exists as a directory, append it to the path.
+        if [[ -d $wdir/$subdir ]]; then
+            wdir+="/$subdir"
+        else
+
+            ##
+            # If it doesn't exist as a directory, print message to stderr.
+            if [[ $debug == true ]]; then
+                _cdc_print 'warn' "$subdir does not exist in $cd_dir." $debug
+            fi
+        fi
+    fi
+
+    echo "$wdir"
 }
 
 ##
@@ -529,9 +717,9 @@ _cdc_is_excluded_dir() {
 }
 
 ##
-# Lists repositories found in $cdc_dirs that aren't excluded.
+# Lists directories found in $CDC_DIRS that aren't excluded.
 #
-# @param string $string
+# @param boolean $debug
 # @return array
 _cdc_repo_list() {
     local dir
@@ -550,7 +738,7 @@ _cdc_repo_list() {
         if ! [[ -d $dir ]]; then
             if [[ $debug == true ]]; then
                 _cdc_print 'warn' \
-                    "$dir is in CDC_REPO_DIRS but isn't a directory."
+                    "$dir is in CDC_DIRS but isn't a directory."
             fi
             continue
         fi
@@ -630,6 +818,7 @@ _cdc_is_repo_dir() {
 #
 # @param string $level
 # @param string $message
+# @param boolean $debug
 # @return void
 _cdc_print() {
     local level="$1"
@@ -670,10 +859,11 @@ _cdc_print() {
 }
 
 ##
-# Source the user's config file.
+# Source the legacy config file for backwards compatibility when this file is
+# sourced. The cdc command itself rejects ~/.cdcrc and tells users to migrate to
+# startup-file variables.
 if [[ -f $HOME/.cdcrc ]]; then
-    _cdc_print 'warn' "Using ~/.cdcrc is deprecated and will be removed " \
-        "in a future version.\nPlease set values in a config file instead."
+    _cdc_print 'warn' "Using ~/.cdcrc is no longer supported.\nPlease export variables from a startup file instead."
     source $HOME/.cdcrc
 fi
 
