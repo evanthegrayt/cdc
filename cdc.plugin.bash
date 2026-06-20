@@ -24,6 +24,7 @@ _cdc_complete() {
     local parent_dirs
     local candidates
     local arg_count
+    local candidate
     local args=()
 
     cur="${COMP_WORDS[COMP_CWORD]}"

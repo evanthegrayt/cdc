@@ -24,12 +24,17 @@ cdc() {
     local cdc_parent_dirs=false
     local print_help=false
     local use_color=${CDC_COLOR:-true}
+    local CDC_ERROR_COLOR="$CDC_ERROR_COLOR"
+    local CDC_SUCCESS_COLOR="$CDC_SUCCESS_COLOR"
+    local CDC_WARNING_COLOR="$CDC_WARNING_COLOR"
+    local CDC_RESET="$CDC_RESET"
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
     # in a shell config file, and manually push with `-u`.
     local pushdir=${CDC_AUTO_PUSH:-true}
     local repos_only=${CDC_REPOS_ONLY:-false}
+    local opt
 
     ##
     # When using getopts in a function, you must declare OPTIND as a local
@@ -137,11 +142,16 @@ cdc() {
     fi
 
     ##
-    # If colors are enabled, set color values if they're not already set.
-    # TODO set a new color instead of unsetting the globals. When the globals
-    # are unset, we can't report what they're set to in the debug screen. Pass
-    # the variables to the _cdc_print function.
-    _cdc_apply_color_config "$use_color"
+    # If colors are enabled, set color values for this cdc call. These are
+    # local to avoid leaving default color variables in the user's shell.
+    if [[ $use_color == true ]]; then
+        : ${CDC_ERROR_COLOR:='\033[0;31m'}
+        : ${CDC_SUCCESS_COLOR:='\033[0;32m'}
+        : ${CDC_WARNING_COLOR:='\033[0;33m'}
+        CDC_RESET='\033[0m'
+    else
+        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
+    fi
 
     if [[ $debug == true ]]; then
         _cdc_print_debug_env
@@ -171,7 +181,7 @@ cdc() {
     fi
 
     if [[ $cdc_toggle == true ]]; then
-        _cdc_history_toggle "$debug" || (( rc++ ))
+        _cdc_history_toggle "$debug" || (( rc += 1 ))
         should_return=true
     fi
 
@@ -181,17 +191,17 @@ cdc() {
     fi
 
     if [[ $cdc_show_history == true ]]; then
-        _cdc_history_list "$debug" || (( rc++ ))
+        _cdc_history_list "$debug" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_current == true ]]; then
-        _cdc_history_current "$debug" || (( rc++ ))
+        _cdc_history_current "$debug" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_pop == true ]]; then
-        _cdc_history_pop "$debug" || (( rc++ ))
+        _cdc_history_pop "$debug" || (( rc += 1 ))
         should_return=true
     fi
 
@@ -260,26 +270,6 @@ _cdc_parse_colon_string() {
     done
 
     [[ -n $string ]] && printf "%s\n" "$string"
-}
-
-##
-# Configure color variables used by the printer.
-#
-# @param boolean $use_color
-# @return void
-_cdc_apply_color_config() {
-    local use_color="$1"
-
-    if [[ $use_color == true ]]; then
-        : ${CDC_ERROR_COLOR:='\033[0;31m'}
-        : ${CDC_SUCCESS_COLOR:='\033[0;32m'}
-        : ${CDC_WARNING_COLOR:='\033[0;33m'}
-        CDC_RESET='\033[0m'
-    ##
-    # If colors are not enabled, unset the color variables.
-    else
-        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
-    fi
 }
 
 ##
@@ -409,11 +399,12 @@ _cdc_list_available_dirs() {
 _cdc_list_ignored_dirs() {
     local debug="$1"
     local cdc_ignore_count=0
+    local cdc_ignore
 
     ##
     # If the ignored-name list is empty, return.
     while IFS= read -r cdc_ignore; do
-        (( cdc_ignore_count++ ))
+        (( cdc_ignore_count += 1 ))
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
 
     if (( cdc_ignore_count == 0 )); then
