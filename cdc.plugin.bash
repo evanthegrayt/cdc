@@ -21,6 +21,7 @@ _cdc_complete() {
     local mode
     local allow_ignored
     local repos_only
+    local parent_dirs
     local candidates
     local arg_count
     local args=()
@@ -50,7 +51,8 @@ _cdc_complete() {
     mode=($(_cdc_completion_mode "${args[@]}"))
     allow_ignored="${mode[0]}"
     repos_only="${mode[1]}"
-    candidates="$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only")"
+    parent_dirs="${mode[2]}"
+    candidates="$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only" "$parent_dirs")"
 
     COMPREPLY=()
     while IFS= read -r candidate; do

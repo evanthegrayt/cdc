@@ -12,7 +12,7 @@ _cdc_complete_options() {
   local -a descriptions
 
   options=(
-    -a -c -C -D -d -h -i -L -l -n -p -R -r -t -U -u -w
+    -a -c -C -D -d -h -i -L -l -n -p -P -R -r -t -U -u -w
   )
 
   descriptions=(
@@ -27,6 +27,7 @@ _cdc_complete_options() {
     '-l  List cdc-able directories'
     '-n  cd to the current directory in the stack'
     '-p  cd to the previous directory and pop it from the stack'
+    '-P  cd to a configured parent directory'
     '-R  cd to any directory, even if it is not a repository'
     '-r  Only cd to repositories'
     '-t  Toggle between the last two directories in the stack'
@@ -43,6 +44,7 @@ _cdc() {
   local i
   local allow_ignored
   local repos_only
+  local parent_dirs
   local -a args
   local -a candidates
   local -a mode
@@ -71,7 +73,8 @@ _cdc() {
   mode=($(_cdc_completion_mode "${args[@]}"))
   allow_ignored="${mode[1]}"
   repos_only="${mode[2]}"
-  candidates=("${(@f)$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only")}")
+  parent_dirs="${mode[3]}"
+  candidates=("${(@f)$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only" "$parent_dirs")}")
 
   (( ${#candidates[@]} )) && compadd -S '' -- "${candidates[@]}"
 }

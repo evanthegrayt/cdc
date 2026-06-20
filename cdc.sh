@@ -21,6 +21,7 @@ cdc() {
     local cdc_pop=false
     local cdc_show_history=false
     local cdc_list_ignored=false
+    local cdc_parent_dirs=false
     local print_help=false
     local use_color=${CDC_COLOR:-true}
 
@@ -42,16 +43,8 @@ cdc() {
     fi
 
     ##
-    # NOTE: Experimental feature.
-    # If argument contains a slash, it's assumed to contain subdirectories.
-    # This splits them into the directory root and its subdirectories.
-    if [[ $1 == */* ]]; then
-        local subdir="${1#*/}"
-    fi
-
-    ##
     # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCdDhilLnprRtuUw' opt 2>/dev/null; do
+    while getopts 'acCdDhilLnPprRtuUw' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -95,6 +88,10 @@ cdc() {
             p) cdc_pop=true ;;
 
             ##
+            # -P: cd to a configured parent directory.
+            P) cdc_parent_dirs=true ;;
+
+            ##
             # -r: Force cdc to only cd to repositories.
             r) repos_only=true ;;
 
@@ -136,6 +133,14 @@ cdc() {
     # options) were passed. Then, set cd_dir to $1.
     shift $(( OPTIND - 1 ))
     local cd_dir="${1%%/*}"
+    local subdir
+
+    ##
+    # If argument contains a slash, it's assumed to contain subdirectories.
+    # This splits them into the directory root and its subdirectories.
+    if [[ $1 == */* ]]; then
+        subdir="${1#*/}"
+    fi
 
     ##
     # If colors are enabled, set color values if they're not already set.
@@ -205,12 +210,17 @@ cdc() {
     ##
     # Print usage and exit if the wrong number of arguments are passed.
     if (( $# != 1 )); then
-        _cdc_print 'error' 'USAGE: cdc [DIRECTORY]' $debug
+        _cdc_print 'error' 'USAGE: cdc [OPTION] [DIRECTORY]' $debug
         _cdc_print 'error' '  Use `-h` for more help' $debug
         return 1
     fi
 
-    wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" "$debug")
+    if [[ $cdc_parent_dirs == true ]]; then
+        wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" "$debug")
+    else
+        wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" "$debug")
+    fi
+
     if (( $? == 0 )); then
         ##
         # If pushdir is true and we're changing directories, add the directory
@@ -317,7 +327,7 @@ _cdc_print_debug_env() {
 #
 # @return void
 _cdc_print_help() {
-    printf "${CDC_SUCCESS_COLOR}USAGE: cdc [DIRECTORY]$CDC_RESET"
+    printf "${CDC_SUCCESS_COLOR}USAGE: cdc [OPTION] [DIRECTORY]$CDC_RESET"
     printf "${CDC_WARNING_COLOR}\n\n"
     printf 'Flags will always override options set in startup files!'
     printf "${CDC_RESET}\n"
@@ -339,6 +349,8 @@ _cdc_print_help() {
     echo ' | `cd` to the current directory in the stack.'
     printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
     echo ' | `cd` to the previous directory and pop it from the stack.'
+    printf "  ${CDC_WARNING_COLOR}-P${CDC_RESET}"
+    echo ' | `cd` to a configured parent directory.'
     printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
     echo ' | Toggle between the last two directories in the stack.'
     printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
@@ -649,6 +661,50 @@ _cdc_find_dir() {
 }
 
 ##
+# Find a configured parent directory by its basename.
+#
+# @param string $cd_dir
+# @param boolean $allow_ignored
+# @param boolean $debug
+# @return string
+_cdc_find_parent_dir() {
+    local cd_dir="$1"
+    local allow_ignored="$2"
+    local debug="$3"
+    local dir
+    local parent_dir
+
+    while IFS= read -r dir; do
+        [[ -n $dir ]] || continue
+
+        if ! [[ -d $dir ]]; then
+            if [[ $debug == true ]]; then
+                _cdc_print 'warn' \
+                    "$dir is in CDC_DIRS but isn't a directory." $debug
+            fi
+            continue
+        fi
+
+        parent_dir=${dir%/}
+        parent_dir=${parent_dir##*/}
+
+        if [[ $parent_dir != "$cd_dir" ]]; then
+            continue
+        elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$parent_dir"; then
+            if [[ $debug == true ]]; then
+                _cdc_print 'warn' 'Match was found but it is ignored.' $debug
+            fi
+            continue
+        fi
+
+        echo "$dir"
+        return 0
+    done < <(_cdc_parse_colon_string "$CDC_DIRS")
+
+    return 2
+}
+
+##
 # Append a requested subdirectory if it exists.
 #
 # @param string $wdir
@@ -786,7 +842,7 @@ _cdc_completion_terminal_options() {
 #
 # @return string
 _cdc_completion_directory_options() {
-    echo "-a -c -C -D -r -R -u -U -w"
+    echo "-a -c -C -D -P -r -R -u -U -w"
 }
 
 ##
@@ -844,6 +900,7 @@ _cdc_completion_mode() {
     local opt
     local opts
     local allow_ignored=false
+    local parent_dirs=false
     local repos_only=${CDC_REPOS_ONLY:-false}
 
     for arg in "$@"; do
@@ -857,13 +914,14 @@ _cdc_completion_mode() {
 
             case "$opt" in
                 a) allow_ignored=true ;;
+                P) parent_dirs=true ;;
                 r) repos_only=true ;;
                 R) repos_only=false ;;
             esac
         done
     done
 
-    echo "$allow_ignored $repos_only"
+    echo "$allow_ignored $repos_only $parent_dirs"
 }
 
 ##
@@ -898,6 +956,30 @@ _cdc_completion_repo_list() {
 
             echo "$subdir"
         done
+    done < <(_cdc_parse_colon_string "$CDC_DIRS")
+}
+
+##
+# List configured parent directories for completion.
+#
+# @param boolean $allow_ignored
+# @return string
+_cdc_completion_parent_list() {
+    local allow_ignored="$1"
+    local dir
+    local parent_dir
+
+    while IFS= read -r dir; do
+        [[ -d $dir ]] || continue
+
+        parent_dir=${dir%/}
+        parent_dir=${parent_dir##*/}
+
+        if [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$parent_dir"; then
+            continue
+        fi
+
+        echo "$parent_dir"
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
 }
 
@@ -944,11 +1026,13 @@ _cdc_completion_subdir_list() {
 # @param string $current
 # @param boolean $allow_ignored
 # @param boolean $repos_only
+# @param boolean $parent_dirs
 # @return string
 _cdc_completion_list() {
     local current="$1"
     local allow_ignored="${2:-false}"
     local repos_only="${3:-${CDC_REPOS_ONLY:-false}}"
+    local parent_dirs="${4:-false}"
     local cd_dir
     local subdir
     local wdir
@@ -957,10 +1041,20 @@ _cdc_completion_list() {
         cd_dir="${current%%/*}"
         subdir="${current#*/}"
 
-        wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" false)
+        if [[ $parent_dirs == true ]]; then
+            wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" false)
+        else
+            wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" false)
+        fi
+
         (( $? == 0 )) || return 0
 
         _cdc_completion_subdir_list "$cd_dir" "$wdir" "$subdir"
+        return 0
+    fi
+
+    if [[ $parent_dirs == true ]]; then
+        _cdc_completion_parent_list "$allow_ignored"
         return 0
     fi
 

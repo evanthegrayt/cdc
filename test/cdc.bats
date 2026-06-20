@@ -29,6 +29,22 @@ setup() {
     [ "${#CDC_HISTORY[@]}" -eq 0 ]
 }
 
+@test "cdc -P changes to a configured parent directory" {
+    cdc -P one
+
+    [ "$PWD" = "$CDC_FIXTURE/one" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one" ]
+}
+
+@test "cdc -P supports subdirectories under a configured parent directory" {
+    cdc -P two/plain
+
+    [ "$PWD" = "$CDC_FIXTURE/two/plain" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/two" ]
+}
+
 @test "cdc respects ignored directories unless -a is passed" {
     run cdc -w ignored
     assert_failure_status 2
@@ -255,6 +271,27 @@ setup() {
     assert_output_not_contains "plain"
 }
 
+@test "bash completion lists configured parents with -P" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc -P "")
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains "one"
+    assert_output_contains "two"
+    assert_output_contains "three"
+    assert_output_not_contains "repo"
+    assert_output_not_contains "plain"
+    assert_output_not_contains "custom"
+}
+
 @test "bash completion suppresses directory operands after action flags" {
     export CDC_PROJECT_ROOT
 
@@ -374,6 +411,37 @@ setup() {
     assert_output_not_contains "plain"
 }
 
+@test "zsh completion lists configured parents with -P" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            local arg
+            for arg in "$@"; do
+                case "$arg" in
+                    -S|--|"") continue ;;
+                    *) print -r -- "$arg" ;;
+                esac
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc -P "")
+        CURRENT=3
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains "one"
+    assert_output_contains "two"
+    assert_output_contains "three"
+    assert_output_not_contains "repo"
+    assert_output_not_contains "plain"
+    assert_output_not_contains "custom"
+}
+
 @test "zsh completion suppresses directory operands after action flags" {
     export CDC_PROJECT_ROOT
 
@@ -435,6 +503,7 @@ setup() {
     '
 
     assert_success
+    assert_output_contains "-P  cd to a configured parent directory"
     assert_output_contains "-R  cd to any directory, even if it is not a repository"
     assert_output_contains "-p  cd to the previous directory and pop it from the stack"
     assert_output_not_contains "even it is not"
