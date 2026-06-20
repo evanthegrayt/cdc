@@ -178,6 +178,34 @@ setup() {
     [ "$output" = "You must set CDC_DIRS in a config file" ]
 }
 
+@test "cdc ignores .cdcrc files" {
+    LEGACY_HOME="$BATS_TEST_TMPDIR/legacy home"
+    mkdir -p "$LEGACY_HOME"
+    printf "%s\n" \
+        "export CDC_DIRS=/not/from/cdcrc" \
+        "export CDC_IGNORE=from_cdcrc" \
+        > "$LEGACY_HOME/.cdcrc"
+
+    run bash -c '
+        HOME="$1"
+        unset CDC_DIRS CDC_IGNORE
+        source "$2/cdc.sh"
+
+        if [[ -n $CDC_DIRS || -n $CDC_IGNORE ]]; then
+            printf "sourced .cdcrc: %s %s\n" "$CDC_DIRS" "$CDC_IGNORE"
+            exit 1
+        fi
+
+        export CDC_DIRS="$3/one:$3/two:$3/three"
+        export CDC_IGNORE=ignored
+        cd "$3/start"
+        cdc -w repo
+    ' bash "$LEGACY_HOME" "$CDC_PROJECT_ROOT" "$CDC_FIXTURE"
+
+    assert_success
+    [ "$output" = "$CDC_FIXTURE/one/repo" ]
+}
+
 @test "zsh plugin wrapper loads cdc when completion is available" {
     export CDC_PROJECT_ROOT
 

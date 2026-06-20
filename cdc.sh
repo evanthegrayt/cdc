@@ -27,7 +27,7 @@ cdc() {
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
-    # in a startup file, and manually push with `-u`.
+    # in a shell config file, and manually push with `-u`.
     local pushdir=${CDC_AUTO_PUSH:-true}
     local repos_only=${CDC_REPOS_ONLY:-false}
 
@@ -35,12 +35,6 @@ cdc() {
     # When using getopts in a function, you must declare OPTIND as a local
     # variable, or it will only work the first time you call it.
     local OPTIND
-
-    if [[ -f $HOME/.cdcrc ]]; then
-        _cdc_print 'error' \
-            "File ~/.cdcrc is no longer used. Delete it and export variables from a startup file (~/.bashrc, ~/.zshrc, etc.)"
-        return 1
-    fi
 
     ##
     # Case options if present. Suppress errors because we'll supply our own.
@@ -154,8 +148,8 @@ cdc() {
     fi
 
     ##
-    # Check for the existence of required variables that should be set in a
-    # startup file. If not found, exit with non-zero return code.
+    # Check for the required variables that should be exported from a shell
+    # config file. If not found, exit with a non-zero return code.
     if [[ -z $CDC_DIRS ]]; then
         _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
         return 1
@@ -245,8 +239,8 @@ cdc() {
     fi
 
     ##
-    # If no directory was found (the argument wasn't in the array), print
-    # message to stderr and return unsuccessful code.
+    # If no directory was found, print a message to stderr and return an
+    # unsuccessful code.
     _cdc_print 'error' "[$cd_dir] not found." $debug
 
     return 2
@@ -256,7 +250,7 @@ cdc() {
 # Split a colon-delimited string into one path per line.
 #
 # @param string $string
-# @return array
+# @return string
 _cdc_parse_colon_string() {
     local string="$1"
 
@@ -361,7 +355,7 @@ _cdc_print_help() {
 
     printf "${CDC_SUCCESS_COLOR}USAGE: cdc [OPTION] [DIRECTORY]$CDC_RESET"
     printf "${CDC_WARNING_COLOR}\n\n"
-    printf 'Flags will always override options set in startup files!'
+    printf 'Flags will always override options set in shell config files!'
     printf "${CDC_RESET}\n"
 
     while IFS=$'\t' read -r opt kind description; do
@@ -417,7 +411,7 @@ _cdc_list_ignored_dirs() {
     local cdc_ignore_count=0
 
     ##
-    # If the ignore array is empty, return.
+    # If the ignored-name list is empty, return.
     while IFS= read -r cdc_ignore; do
         (( cdc_ignore_count++ ))
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
@@ -612,13 +606,12 @@ _cdc_find_dir() {
     local dir
 
     ##
-    # Loop through every element in $cdc_dirs.
+    # Loop through every path in the colon-delimited CDC_DIRS value.
     while IFS= read -r dir; do
 
         ##
-        # If a directory is in the $cdc_dirs array, but the directory doesn't
-        # exist, print a message to stderr and move on to the next directory in
-        # the array.
+        # If a path is in CDC_DIRS but doesn't exist, print a message to stderr
+        # and move on to the next configured path.
         if ! [[ -d $dir ]]; then
             if [[ $debug == true ]]; then
                 _cdc_print 'warn' \
@@ -750,13 +743,13 @@ _cdc_is_excluded_dir() {
     local string="$1"
 
     ##
-    # If $cdc_ignore isn't defined or is empty, return "false".
+    # If CDC_IGNORE isn't defined or is empty, return "false".
     if [[ -z $CDC_IGNORE ]]; then
         return 1
     fi
 
     ##
-    # Loop through each element of $CDC_IGNORE array.
+    # Loop through each ignored name in the colon-delimited CDC_IGNORE value.
     while IFS= read -r element; do
 
         ##
@@ -773,10 +766,10 @@ _cdc_is_excluded_dir() {
 }
 
 ##
-# Lists directories found in $CDC_DIRS that aren't excluded.
+# Lists directories found in CDC_DIRS that aren't excluded.
 #
 # @param boolean $debug
-# @return array
+# @return string
 _cdc_repo_list() {
     local dir
     local subdir
@@ -785,7 +778,7 @@ _cdc_repo_list() {
     local debug=${1:-false}
 
     ##
-    # Loop through all elements of $cdc_dirs array.
+    # Loop through every path in the colon-delimited CDC_DIRS value.
     while IFS= read -r dir; do
 
         ##
@@ -826,7 +819,7 @@ _cdc_repo_list() {
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
 
     ##
-    # "Return" the array.
+    # Print one matching directory name per line.
     printf "%s\n" "${directories[@]}"
 }
 
@@ -1215,14 +1208,6 @@ _cdc_print() {
 }
 
 ##
-# Source the legacy config file for backwards compatibility when this file is
-# sourced. The cdc command itself rejects ~/.cdcrc and tells users to migrate to
-# startup-file variables.
-if [[ -f $HOME/.cdcrc ]]; then
-    _cdc_print 'warn' "Using ~/.cdcrc is no longer supported.\nPlease export variables from a startup file instead."
-    source $HOME/.cdcrc
-fi
-
 ##
 # Set the array that will remember the history. Needs to persist.
 CDC_HISTORY=()
