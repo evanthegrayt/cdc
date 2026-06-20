@@ -7,27 +7,73 @@ source "${0:h}/cdc.sh"
 
 ##
 # Add completion arguments.
+_cdc_complete_options() {
+  local -a options
+  local -a descriptions
+
+  options=(
+    -a -c -C -D -d -h -i -L -l -n -p -R -r -t -U -u -w
+  )
+
+  descriptions=(
+    '-a  cd to the directory even if it is ignored'
+    '-c  Enable colored output'
+    '-C  Disable colored output'
+    '-D  Enable debug mode for unexpected behavior'
+    '-d  List the directories in the stack'
+    '-h  Print this help'
+    '-i  List ignored directories'
+    '-L  List directories that cdc searches'
+    '-l  List cdc-able directories'
+    '-n  cd to the current directory in the stack'
+    '-p  cd to the previous directory and pop it from the stack'
+    '-R  cd to any directory, even if it is not a repository'
+    '-r  Only cd to repositories'
+    '-t  Toggle between the last two directories in the stack'
+    '-U  Do not push the directory onto the stack'
+    '-u  Push the directory onto the stack'
+    '-w  Print the directory location instead of changing to it'
+  )
+
+  compadd -d descriptions -- "${options[@]}"
+}
+
 _cdc() {
-  _arguments -s \
-    -D"[Debug mode for when unexpected things are happening]" \
-    - help \
-    -h"[Print this help]" \
-    - no_other_args \
-    -n"[cd to the current directory in the stack]" \
-    -p"[cd to previous directory and pop from the stack]" \
-    -t"[Toggle between the last two directories in the stack]" \
-    -i"[List all directories that are to be ignored]" \
-    -l"[List all directories that are cdc-able]" \
-    -L"[List all directories in which to search]" \
-    -d"[List the directories in stack]" \
-    - allow_arg \
-    -u"[Push the directory onto the stack]" \
-    -U"[Do not push the directory onto the stack]" \
-    -r"[Only cdc to repositories]" \
-    -R"[cd to any directory, even it is not a repository]" \
-    -a"[cd to the directory even if it is ignored]" \
-    -w"[Print directory location instead of changing to it]" \
-    1::"[Directory to cd]:($(_cdc_repo_list))"
+  local cur
+  local i
+  local allow_ignored
+  local repos_only
+  local -a args
+  local -a candidates
+  local -a mode
+
+  cur="${words[CURRENT]}"
+
+  i=2
+  while (( i < CURRENT )); do
+    args+=("${words[i]}")
+    (( i++ ))
+  done
+
+  if _cdc_completion_has_terminal_action "${args[@]}"; then
+    return
+  fi
+
+  if _cdc_completion_has_operand "${args[@]}"; then
+    return
+  fi
+
+  if [[ $cur == -* ]]; then
+    _cdc_complete_options
+    return
+  fi
+
+  mode=($(_cdc_completion_mode "${args[@]}"))
+  allow_ignored="${mode[1]}"
+  repos_only="${mode[2]}"
+  candidates=("${(@f)$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only")}")
+
+  (( ${#candidates[@]} )) && compadd -S '' -- "${candidates[@]}"
 }
 
 ##

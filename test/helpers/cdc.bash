@@ -42,6 +42,10 @@ assert_output_contains() {
     [[ "$output" == *"$1"* ]]
 }
 
+assert_output_not_contains() {
+    [[ "$output" != *"$1"* ]]
+}
+
 assert_file_equals() {
     [ "$(cat "$1")" = "$2" ]
 }
