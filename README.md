@@ -1,4 +1,4 @@
-# $ cdc [dir]
+# $ cdc [option] [dir]
 > If your repositories are spread throughout your system like a pandemic, then
 > `cdc` is the solution!
 
@@ -193,10 +193,13 @@ Typing `cdc <TAB>` will list all available directories, and this list is built
 on the fly; nothing is hard-coded. Hit `return` after typing the directory name
 to change to that directory.
 
-You *can* append subdirectories, and it will work; however, this is an
-experimental feature, and I don't have tab-completion working for this yet (any
-help with [the issue](https://github.com/evanthegrayt/cdc/issues/2) would be
-greatly appreciated). For example:
+Typing `cdc -P <TAB>` will list the configured parent directories from
+`CDC_DIRS` by name. For example, if `CDC_DIRS` includes
+`/Users/evanthegrayt/repo_dir`, then `cdc -P repo_dir` will change to
+`/Users/evanthegrayt/repo_dir` instead of a repository inside it.
+
+You can append subdirectories, and tab-completion will continue listing
+directories under the selected match. For example:
 
 ```sh
 cdc repo/bin
@@ -222,6 +225,7 @@ overriding variables set in a startup file. There's also a debug mode.
 |-n|`cd` to the current directory in the history stack.|
 |-t|Toggle to the last directory, similar to `cd -`. Rearranges history stack.|
 |-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
+|-P|`cd` to a configured parent directory from `CDC_DIRS`.|
 |-u|Push the directory onto the stack. Similar to the `pushd` command.|
 |-U|Do not push the directory onto the stack.|
 |-r|Only `cd` to repositories.|
