@@ -323,50 +323,51 @@ _cdc_print_debug_env() {
 }
 
 ##
+# Print cdc option metadata as tab-delimited records.
+#
+# Fields:
+#   option letter, completion kind, description
+#
+# @return string
+_cdc_option_specs() {
+    printf "%s\t%s\t%s\n" 'a' 'directory' 'cd to the directory even if it is ignored'
+    printf "%s\t%s\t%s\n" 'c' 'directory' 'Enable colored output'
+    printf "%s\t%s\t%s\n" 'C' 'directory' 'Disable colored output'
+    printf "%s\t%s\t%s\n" 'l' 'terminal' 'List cdc-able directories'
+    printf "%s\t%s\t%s\n" 'L' 'terminal' 'List directories that cdc searches'
+    printf "%s\t%s\t%s\n" 'i' 'terminal' 'List ignored directories'
+    printf "%s\t%s\t%s\n" 'd' 'terminal' 'List the directories in the stack'
+    printf "%s\t%s\t%s\n" 'n' 'terminal' 'cd to the current directory in the stack'
+    printf "%s\t%s\t%s\n" 'p' 'terminal' 'cd to the previous directory and pop it from the stack'
+    printf "%s\t%s\t%s\n" 'P' 'directory' 'cd to a configured parent directory'
+    printf "%s\t%s\t%s\n" 't' 'terminal' 'Toggle between the last two directories in the stack'
+    printf "%s\t%s\t%s\n" 'u' 'directory' 'Push the directory onto the stack'
+    printf "%s\t%s\t%s\n" 'U' 'directory' 'Do not push the directory onto the stack'
+    printf "%s\t%s\t%s\n" 'r' 'directory' 'Only cd to repositories'
+    printf "%s\t%s\t%s\n" 'R' 'directory' 'cd to any directory, even if it is not a repository'
+    printf "%s\t%s\t%s\n" 'D' 'directory' 'Enable debug mode for unexpected behavior'
+    printf "%s\t%s\t%s\n" 'w' 'directory' 'Print the directory location instead of changing to it'
+    printf "%s\t%s\t%s\n" 'h' 'terminal' 'Print this help'
+}
+
+##
 # Print cdc help.
 #
 # @return void
 _cdc_print_help() {
+    local opt
+    local kind
+    local description
+
     printf "${CDC_SUCCESS_COLOR}USAGE: cdc [OPTION] [DIRECTORY]$CDC_RESET"
     printf "${CDC_WARNING_COLOR}\n\n"
     printf 'Flags will always override options set in startup files!'
     printf "${CDC_RESET}\n"
-    printf "  ${CDC_WARNING_COLOR}-a${CDC_RESET}"
-    echo ' | `cd` to the directory even if it is ignored.'
-    printf "  ${CDC_WARNING_COLOR}-c${CDC_RESET}"
-    echo ' | Enable colored output'
-    printf "  ${CDC_WARNING_COLOR}-C${CDC_RESET}"
-    echo ' | Disable colored output'
-    printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
-    echo ' | List cdc-able directories.'
-    printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
-    echo ' | List directories that cdc searches.'
-    printf "  ${CDC_WARNING_COLOR}-i${CDC_RESET}"
-    echo ' | List ignored directories.'
-    printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
-    echo ' | List the directories in the stack.'
-    printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
-    echo ' | `cd` to the current directory in the stack.'
-    printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
-    echo ' | `cd` to the previous directory and pop it from the stack.'
-    printf "  ${CDC_WARNING_COLOR}-P${CDC_RESET}"
-    echo ' | `cd` to a configured parent directory.'
-    printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
-    echo ' | Toggle between the last two directories in the stack.'
-    printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
-    echo ' | Push the directory onto the stack.'
-    printf "  ${CDC_WARNING_COLOR}-U${CDC_RESET}"
-    echo ' | Do not push the directory onto the stack.'
-    printf "  ${CDC_WARNING_COLOR}-r${CDC_RESET}"
-    echo ' | Only `cd` to repositories.'
-    printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
-    echo ' | `cd` to any directory, even if it is not a repository.'
-    printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
-    echo ' | Enable debug mode for unexpected behavior.'
-    printf "  ${CDC_WARNING_COLOR}-w${CDC_RESET}"
-    echo ' | Print the directory location instead of changing to it.'
-    printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
-    echo ' | Print this help.'
+
+    while IFS=$'\t' read -r opt kind description; do
+        printf "  ${CDC_WARNING_COLOR}-%s${CDC_RESET}" "$opt"
+        printf " | %s\n" "$description"
+    done < <(_cdc_option_specs)
 }
 
 ##
@@ -830,11 +831,59 @@ _cdc_repo_list() {
 }
 
 ##
+# List command-line flags that match the given completion kind.
+#
+# @param string $requested_kind
+# @return string
+_cdc_completion_options_by_kind() {
+    local requested_kind="$1"
+    local opt
+    local kind
+    local description
+    local options=()
+
+    while IFS=$'\t' read -r opt kind description; do
+        [[ $kind == "$requested_kind" ]] || continue
+        options+=("-$opt")
+    done < <(_cdc_option_specs)
+
+    echo "${options[*]}"
+}
+
+##
+# List all command-line flags.
+#
+# @return string
+_cdc_completion_all_options() {
+    local opt
+    local kind
+    local description
+
+    while IFS=$'\t' read -r opt kind description; do
+        printf -- "-%s\n" "$opt"
+    done < <(_cdc_option_specs)
+}
+
+##
+# List zsh display descriptions for all command-line flags.
+#
+# @return string
+_cdc_completion_option_descriptions() {
+    local opt
+    local kind
+    local description
+
+    while IFS=$'\t' read -r opt kind description; do
+        printf -- "-%s  %s\n" "$opt" "$description"
+    done < <(_cdc_option_specs)
+}
+
+##
 # List command-line flags that complete a cdc invocation without a directory.
 #
 # @return string
 _cdc_completion_terminal_options() {
-    echo "-h -n -p -t -i -l -L -d"
+    _cdc_completion_options_by_kind terminal
 }
 
 ##
@@ -842,7 +891,28 @@ _cdc_completion_terminal_options() {
 #
 # @return string
 _cdc_completion_directory_options() {
-    echo "-a -c -C -D -P -r -R -u -U -w"
+    _cdc_completion_options_by_kind directory
+}
+
+##
+# Return the completion kind for an option letter.
+#
+# @param string $option
+# @return string
+_cdc_completion_option_kind() {
+    local option="$1"
+    local opt
+    local kind
+    local description
+
+    while IFS=$'\t' read -r opt kind description; do
+        if [[ $opt == "$option" ]]; then
+            echo "$kind"
+            return 0
+        fi
+    done < <(_cdc_option_specs)
+
+    return 1
 }
 
 ##
@@ -864,9 +934,7 @@ _cdc_completion_has_terminal_action() {
             opt="${opts%"${opts#?}"}"
             opts="${opts#?}"
 
-            case "$opt" in
-                h|n|p|t|i|l|L|d) return 0 ;;
-            esac
+            [[ $(_cdc_completion_option_kind "$opt") == terminal ]] && return 0
         done
     done
 
