@@ -110,13 +110,14 @@ source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
 ```
 
 ## Set-up
-The following settings require variables to be set from a startup file, such as
-`~/.zshrc` or `~/.bashrc`.  You can view an example of this in [my config
+The following settings require variables to be exported from a shell config
+file, such as `~/.zshrc` or `~/.bashrc`. `cdc` does not read a separate
+`~/.cdcrc` file. You can view an example of this in [my config
 file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/shellrc#L27).
 
 ### Telling cdc where to look
-To use this plugin, you need to `export CDC_DIRS` in a startup file. It should
-be a string with absolute paths to the directories to search, separated by
+To use this plugin, you need to `export CDC_DIRS` in a shell config file. It
+should be a string with absolute paths to the directories to search, separated by
 colons (similar to `$PATH`).
 
 ```sh
@@ -143,7 +144,7 @@ export CDC_IGNORE=notes_directory:training
 ```
 
 ### Only recognize actual repositories
-You can `export CDC_REPOS_ONLY` in a startup file to make `cdc` only recognize
+You can `export CDC_REPOS_ONLY` in a shell config file to make `cdc` only recognize
 repositories as directories. This is **disabled by default**. You can also set
 a string of files and directories that mark what you consider a repository.
 Note that markers that are directories must end with a `/`, while files must
@@ -153,7 +154,7 @@ not.
 # Enable "repos-only" mode. Note, the default is false.
 export CDC_REPOS_ONLY=true
 # Set repository markers with the following. Note, the following is already the
-# default, but this is how you can overwrite it in ~/.zshrc or similar.
+# default, but this is how you can override it in ~/.zshrc or similar.
 export CDC_REPO_MARKERS=.git/:.git:Rakefile:Makefile:.hg/:.bzr/:.svn/
 ```
 
@@ -163,7 +164,7 @@ Note that this setting can be overridden with the `-r` and `-R` options. See
 ### Automatically pushing to the history stack
 By default, every `cdc` call that changes directories will push the directory
 onto the history stack. You can disable this feature by setting `CDC_AUTO_PUSH`
-to `false` in a startup file.
+to `false` in a shell config file.
 
 ```sh
 # Disable auto-pushing to history stack.
@@ -178,7 +179,7 @@ history stack.
 
 ### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
-adding the following lines to a startup file.
+adding the following lines to a shell config file.
 
 ```sh
 export CDC_COLOR=false               # Default: true. Setting to false disables colors
@@ -211,7 +212,7 @@ print a message to `stderr`.
 ### Options
 The plugin comes with a few available options. Some are for dealing with the
 directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
-overriding variables set in a startup file. There's also a debug mode.
+overriding variables set in a shell config file. There's also a debug mode.
 
 |Flag|What it does|
 |:------|:-----------|
