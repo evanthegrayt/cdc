@@ -155,6 +155,212 @@ setup() {
     assert_output_contains "cdc is a function"
 }
 
+@test "bash completion completes cdc subdirectories" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc repo/)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains "repo/bin"
+}
+
+@test "bash completion applies directory-affecting flags" {
+    export CDC_PROJECT_ROOT
+    export CDC_REPOS_ONLY=true
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc -R "")
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains "plain"
+
+    export CDC_REPOS_ONLY=false
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc -r "")
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_not_contains "plain"
+}
+
+@test "bash completion suppresses directory operands after action flags" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc -p "")
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    [ "$output" = "" ]
+}
+
+@test "zsh completion completes cdc subdirectories" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            local arg
+            for arg in "$@"; do
+                case "$arg" in
+                    -S|--|"") continue ;;
+                    *) print -r -- "$arg" ;;
+                esac
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc repo/)
+        CURRENT=2
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains "repo/bin"
+}
+
+@test "zsh completion applies directory-affecting flags" {
+    export CDC_PROJECT_ROOT
+    export CDC_REPOS_ONLY=true
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            local arg
+            for arg in "$@"; do
+                case "$arg" in
+                    -S|--|"") continue ;;
+                    *) print -r -- "$arg" ;;
+                esac
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc -R "")
+        CURRENT=3
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains "plain"
+
+    export CDC_REPOS_ONLY=false
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            local arg
+            for arg in "$@"; do
+                case "$arg" in
+                    -S|--|"") continue ;;
+                    *) print -r -- "$arg" ;;
+                esac
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc -r "")
+        CURRENT=3
+        _cdc
+    '
+
+    assert_success
+    assert_output_not_contains "plain"
+}
+
+@test "zsh completion suppresses directory operands after action flags" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            local arg
+            for arg in "$@"; do
+                case "$arg" in
+                    -S|--|"") continue ;;
+                    *) print -r -- "$arg" ;;
+                esac
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc -p "")
+        CURRENT=3
+        _cdc
+    '
+
+    assert_success
+    [ "$output" = "" ]
+}
+
+@test "zsh option completion display includes flags and corrected descriptions" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            local display_array
+
+            while (( $# )); do
+                case "$1" in
+                    -d)
+                        display_array="$2"
+                        shift 2
+                        ;;
+                    --)
+                        shift
+                        break
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+
+            eval "print -rl -- \"\${${display_array}[@]}\""
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc -)
+        CURRENT=2
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains "-R  cd to any directory, even if it is not a repository"
+    assert_output_contains "-p  cd to the previous directory and pop it from the stack"
+    assert_output_not_contains "even it is not"
+}
+
 @test "zsh can change directories and pop history" {
     export CDC_PROJECT_ROOT
     export CDC_FIXTURE

@@ -318,29 +318,29 @@ _cdc_print_help() {
     printf "  ${CDC_WARNING_COLOR}-C${CDC_RESET}"
     echo ' | Disable colored output'
     printf "  ${CDC_WARNING_COLOR}-l${CDC_RESET}"
-    echo ' | List all directories that are cdc-able.'
+    echo ' | List cdc-able directories.'
     printf "  ${CDC_WARNING_COLOR}-L${CDC_RESET}"
-    echo ' | List all directories in which to search.'
+    echo ' | List directories that cdc searches.'
     printf "  ${CDC_WARNING_COLOR}-i${CDC_RESET}"
-    echo ' | List all directories that are to be ignored.'
+    echo ' | List ignored directories.'
     printf "  ${CDC_WARNING_COLOR}-d${CDC_RESET}"
-    echo ' | List the directories in stack.'
+    echo ' | List the directories in the stack.'
     printf "  ${CDC_WARNING_COLOR}-n${CDC_RESET}"
     echo ' | `cd` to the current directory in the stack.'
     printf "  ${CDC_WARNING_COLOR}-p${CDC_RESET}"
-    echo ' | `cd` to previous directory and pop from the stack.'
+    echo ' | `cd` to the previous directory and pop it from the stack.'
     printf "  ${CDC_WARNING_COLOR}-t${CDC_RESET}"
     echo ' | Toggle between the last two directories in the stack.'
     printf "  ${CDC_WARNING_COLOR}-u${CDC_RESET}"
     echo ' | Push the directory onto the stack.'
     printf "  ${CDC_WARNING_COLOR}-U${CDC_RESET}"
-    echo ' | Do not push the directory onto the stack'
+    echo ' | Do not push the directory onto the stack.'
     printf "  ${CDC_WARNING_COLOR}-r${CDC_RESET}"
-    echo ' | Only cdc to repositories.'
+    echo ' | Only `cd` to repositories.'
     printf "  ${CDC_WARNING_COLOR}-R${CDC_RESET}"
-    echo ' | cd to any directory, even it is not a repository.'
+    echo ' | `cd` to any directory, even if it is not a repository.'
     printf "  ${CDC_WARNING_COLOR}-D${CDC_RESET}"
-    echo ' | Debug mode for when unexpected things are happening.'
+    echo ' | Enable debug mode for unexpected behavior.'
     printf "  ${CDC_WARNING_COLOR}-w${CDC_RESET}"
     echo ' | Print the directory location instead of changing to it.'
     printf "  ${CDC_WARNING_COLOR}-h${CDC_RESET}"
@@ -772,6 +772,201 @@ _cdc_repo_list() {
     ##
     # "Return" the array.
     echo "${directories[@]}"
+}
+
+##
+# List command-line flags that complete a cdc invocation without a directory.
+#
+# @return string
+_cdc_completion_terminal_options() {
+    echo "-h -n -p -t -i -l -L -d"
+}
+
+##
+# List command-line flags that still allow a directory argument.
+#
+# @return string
+_cdc_completion_directory_options() {
+    echo "-a -c -C -D -r -R -u -U -w"
+}
+
+##
+# Does a set of already-typed arguments include an option-only action?
+#
+# @param array $@
+# @return boolean
+_cdc_completion_has_terminal_action() {
+    local arg
+    local opt
+    local opts
+
+    for arg in "$@"; do
+        [[ $arg == -- ]] && return 1
+        [[ $arg == -* && $arg != "-" ]] || continue
+
+        opts="${arg#-}"
+        while [[ -n $opts ]]; do
+            opt="${opts%"${opts#?}"}"
+            opts="${opts#?}"
+
+            case "$opt" in
+                h|n|p|t|i|l|L|d) return 0 ;;
+            esac
+        done
+    done
+
+    return 1
+}
+
+##
+# Does a set of already-typed arguments include the directory operand?
+#
+# @param array $@
+# @return boolean
+_cdc_completion_has_operand() {
+    local arg
+
+    for arg in "$@"; do
+        [[ $arg == -- ]] && return 1
+        [[ $arg == -* && $arg != "-" ]] && continue
+        [[ -n $arg ]] && return 0
+    done
+
+    return 1
+}
+
+##
+# Print completion mode booleans after applying already-typed options.
+#
+# @param array $@
+# @return string
+_cdc_completion_mode() {
+    local arg
+    local opt
+    local opts
+    local allow_ignored=false
+    local repos_only=${CDC_REPOS_ONLY:-false}
+
+    for arg in "$@"; do
+        [[ $arg == -- ]] && break
+        [[ $arg == -* && $arg != "-" ]] || continue
+
+        opts="${arg#-}"
+        while [[ -n $opts ]]; do
+            opt="${opts%"${opts#?}"}"
+            opts="${opts#?}"
+
+            case "$opt" in
+                a) allow_ignored=true ;;
+                r) repos_only=true ;;
+                R) repos_only=false ;;
+            esac
+        done
+    done
+
+    echo "$allow_ignored $repos_only"
+}
+
+##
+# List top-level cdc directories for completion under the requested mode.
+#
+# @param boolean $allow_ignored
+# @param boolean $repos_only
+# @return string
+_cdc_completion_repo_list() {
+    local allow_ignored="$1"
+    local repos_only="$2"
+    local dir
+    local fulldir
+    local subdir
+    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
+
+    for dir in "${cdc_dirs[@]}"; do
+        [[ -d $dir ]] || continue
+
+        for fulldir in "$dir"/*/; do
+            [[ -d $fulldir ]] || continue
+
+            subdir=${fulldir%/}
+            subdir=${subdir##*/}
+
+            if [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$subdir"; then
+                continue
+            fi
+
+            if [[ $repos_only == true ]] && ! _cdc_is_repo_dir "$fulldir"; then
+                continue
+            fi
+
+            echo "$subdir"
+        done
+    done
+}
+
+##
+# List subdirectories under a matched cdc root for completion.
+#
+# @param string $cd_dir
+# @param string $wdir
+# @param string $partial_subdir
+# @return string
+_cdc_completion_subdir_list() {
+    local cd_dir="$1"
+    local wdir="$2"
+    local partial_subdir="$3"
+    local parent
+    local search_dir
+    local candidate_prefix
+    local fulldir
+    local subdir
+
+    if [[ $partial_subdir == */* ]]; then
+        parent="${partial_subdir%/*}"
+        search_dir="$wdir/$parent"
+        candidate_prefix="$cd_dir/$parent/"
+    else
+        search_dir="$wdir"
+        candidate_prefix="$cd_dir/"
+    fi
+
+    [[ -d $search_dir ]] || return 0
+
+    for fulldir in "$search_dir"/*/; do
+        [[ -d $fulldir ]] || continue
+
+        subdir=${fulldir%/}
+        subdir=${subdir##*/}
+        echo "$candidate_prefix$subdir"
+    done
+}
+
+##
+# List directory completions for the current word.
+#
+# @param string $current
+# @param boolean $allow_ignored
+# @param boolean $repos_only
+# @return string
+_cdc_completion_list() {
+    local current="$1"
+    local allow_ignored="${2:-false}"
+    local repos_only="${3:-${CDC_REPOS_ONLY:-false}}"
+    local cd_dir
+    local subdir
+    local wdir
+
+    if [[ $current == */* ]]; then
+        cd_dir="${current%%/*}"
+        subdir="${current#*/}"
+
+        wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" false)
+        (( $? == 0 )) || return 0
+
+        _cdc_completion_subdir_list "$cd_dir" "$wdir" "$subdir"
+        return 0
+    fi
+
+    _cdc_completion_repo_list "$allow_ignored" "$repos_only"
 }
 
 ##
