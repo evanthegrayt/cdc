@@ -159,6 +159,21 @@ setup() {
     assert_output_contains "custom"
 }
 
+@test "cdc -i works with errexit enabled" {
+    export CDC_PROJECT_ROOT
+    export CDC_FIXTURE
+
+    run bash -e -c '
+        source "$CDC_PROJECT_ROOT/cdc.sh"
+        export CDC_DIRS="$CDC_FIXTURE/one:$CDC_FIXTURE/two:$CDC_FIXTURE/three"
+        export CDC_IGNORE=ignored
+        cdc -i
+    '
+
+    assert_success
+    [ "$output" = "ignored" ]
+}
+
 @test "help output includes option descriptions" {
     run cdc -h
 
@@ -204,6 +219,41 @@ setup() {
 
     assert_success
     [ "$output" = "$CDC_FIXTURE/one/repo" ]
+}
+
+@test "cdc does not leak internal variables" {
+    unset opt wdir cd_dir subdir use_color pushdir repos_only CDC_RESET
+    unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
+
+    cdc -w repo >/dev/null
+    cdc -i >/dev/null
+
+    [ -z "${opt+x}" ]
+    [ -z "${wdir+x}" ]
+    [ -z "${cd_dir+x}" ]
+    [ -z "${subdir+x}" ]
+    [ -z "${use_color+x}" ]
+    [ -z "${pushdir+x}" ]
+    [ -z "${repos_only+x}" ]
+    [ -z "${CDC_RESET+x}" ]
+    [ -z "${CDC_SUCCESS_COLOR+x}" ]
+    [ -z "${CDC_WARNING_COLOR+x}" ]
+    [ -z "${CDC_ERROR_COLOR+x}" ]
+    [ -z "${cdc_ignore+x}" ]
+}
+
+@test "cdc preserves user color variables" {
+    export CDC_SUCCESS_COLOR=user-success
+    export CDC_WARNING_COLOR=user-warning
+    export CDC_ERROR_COLOR=user-error
+    unset CDC_RESET
+
+    cdc -w repo >/dev/null
+
+    [ "$CDC_SUCCESS_COLOR" = "user-success" ]
+    [ "$CDC_WARNING_COLOR" = "user-warning" ]
+    [ "$CDC_ERROR_COLOR" = "user-error" ]
+    [ -z "${CDC_RESET+x}" ]
 }
 
 @test "zsh plugin wrapper loads cdc when completion is available" {
@@ -276,6 +326,28 @@ setup() {
 
     assert_success
     assert_output_contains "repo with space"
+}
+
+@test "bash completion does not leak internal variables" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        unset cur mode allow_ignored repos_only parent_dirs candidates arg_count candidate args
+        COMP_WORDS=(cdc repo/)
+        COMP_CWORD=1
+        _cdc_complete
+
+        for variable in cur mode allow_ignored repos_only parent_dirs candidates arg_count candidate args; do
+            if declare -p "$variable" >/dev/null 2>&1; then
+                printf "%s leaked\n" "$variable"
+                exit 1
+            fi
+        done
+    '
+
+    assert_success
 }
 
 @test "bash completion applies directory-affecting flags" {
@@ -396,6 +468,31 @@ setup() {
 
     assert_success
     assert_output_contains "repo with space"
+}
+
+@test "zsh completion does not leak internal variables" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() { :; }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        unset cur i allow_ignored repos_only parent_dirs args candidates mode descriptions
+        words=(cdc repo/)
+        CURRENT=2
+        _cdc
+
+        for variable in cur i allow_ignored repos_only parent_dirs args candidates mode descriptions; do
+            if typeset -p "$variable" >/dev/null 2>&1; then
+                print -r -- "$variable leaked"
+                exit 1
+            fi
+        done
+    '
+
+    assert_success
 }
 
 @test "zsh completion applies directory-affecting flags" {

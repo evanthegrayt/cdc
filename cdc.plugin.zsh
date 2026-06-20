@@ -32,7 +32,7 @@ _cdc() {
   i=2
   while (( i < CURRENT )); do
     args+=("${words[i]}")
-    (( i++ ))
+    (( i += 1 ))
   done
 
   if _cdc_completion_has_terminal_action "${args[@]}"; then
