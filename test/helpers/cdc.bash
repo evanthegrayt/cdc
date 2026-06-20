@@ -5,14 +5,17 @@ cdc_project_root() {
 
 setup_cdc_fixture() {
     CDC_PROJECT_ROOT="$(cdc_project_root)"
-    CDC_FIXTURE="$BATS_TEST_TMPDIR/cdc-fixture"
+    CDC_FIXTURE="$BATS_TEST_TMPDIR/cdc fixture"
     CDC_HOME="$CDC_FIXTURE/home"
 
     mkdir -p "$CDC_HOME"
     mkdir -p "$CDC_FIXTURE/one/repo/.git"
     mkdir -p "$CDC_FIXTURE/one/repo/bin"
+    mkdir -p "$CDC_FIXTURE/one/repo with space/.git"
+    mkdir -p "$CDC_FIXTURE/one/repo with space/bin"
     mkdir -p "$CDC_FIXTURE/two/repo/.git"
     mkdir -p "$CDC_FIXTURE/two/ignored"
+    mkdir -p "$CDC_FIXTURE/two/ignored with space"
     mkdir -p "$CDC_FIXTURE/two/plain"
     mkdir -p "$CDC_FIXTURE/three/custom"
     mkdir -p "$CDC_FIXTURE/start"
