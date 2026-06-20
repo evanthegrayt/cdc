@@ -4,7 +4,7 @@ CDC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 ##
 # Source the plugin and completion functions.
-source $CDC_DIR/cdc.sh
+source "$CDC_DIR/cdc.sh"
 unset CDC_DIR
 
 ##
@@ -52,7 +52,10 @@ _cdc_complete() {
     repos_only="${mode[1]}"
     candidates="$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only")"
 
-    COMPREPLY=( $( compgen -W "$candidates" -- "$cur" ) )
+    COMPREPLY=()
+    while IFS= read -r candidate; do
+        [[ $candidate == "$cur"* ]] && COMPREPLY+=("$candidate")
+    done <<< "$candidates"
 }
 
 complete -o nospace -F _cdc_complete cdc

@@ -23,7 +23,6 @@ cdc() {
     local cdc_list_ignored=false
     local print_help=false
     local use_color=${CDC_COLOR:-true}
-    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
@@ -152,7 +151,7 @@ cdc() {
     ##
     # Check for the existence of required variables that should be set in a
     # startup file. If not found, exit with non-zero return code.
-    if (( ${#cdc_dirs[@]} == 0 )); then
+    if [[ -z $CDC_DIRS ]]; then
         _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
         return 1
     fi
@@ -225,7 +224,7 @@ cdc() {
         ##
         # Finally, cd to the path, or display it if $which is true.
         if [[ $which == true ]]; then
-            echo $wdir
+            printf "%s\n" "$wdir"
         else
             cd "$wdir"
         fi
@@ -244,12 +243,19 @@ cdc() {
 }
 
 ##
-# Split a colon-delimited string into shell words.
+# Split a colon-delimited string into one path per line.
 #
 # @param string $string
 # @return array
 _cdc_parse_colon_string() {
-    printf "%s\n" "${1//:/ }"
+    local string="$1"
+
+    while [[ $string == *:* ]]; do
+        printf "%s\n" "${string%%:*}"
+        string="${string#*:}"
+    done
+
+    [[ -n $string ]] && printf "%s\n" "$string"
 }
 
 ##
@@ -277,14 +283,18 @@ _cdc_apply_color_config() {
 #
 # @return void
 _cdc_print_debug_env() {
-    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
-    local cdc_ignore=($( _cdc_parse_colon_string "$CDC_IGNORE" ))
+    local cdc_dir
+    local cdc_ignore
 
     echo "========================= ENV ==========================="
-    printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
-        "${cdc_dirs[@]}"
-    printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
-        "${cdc_ignore[@]}"
+    while IFS= read -r cdc_dir; do
+        printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
+            "$cdc_dir"
+    done < <(_cdc_parse_colon_string "$CDC_DIRS")
+    while IFS= read -r cdc_ignore; do
+        printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
+            "$cdc_ignore"
+    done < <(_cdc_parse_colon_string "$CDC_IGNORE")
     echo
     printf "CDC_AUTO_PUSH     = %s\n" \
         $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
@@ -354,13 +364,12 @@ _cdc_print_help() {
 # @return void
 _cdc_list_searched_dirs() {
     local debug="$1"
-    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
 
     if [[ $debug == true ]]; then
         _cdc_print 'success' 'Listing searched directories.' $debug
     fi
 
-    printf "%s\n" "${cdc_dirs[@]}" | column
+    _cdc_parse_colon_string "$CDC_DIRS" | column
 }
 
 ##
@@ -377,14 +386,12 @@ _cdc_list_available_dirs() {
     fi
 
     ##
-    # Get the list of directories.
-    list=($( _cdc_repo_list $debug ))
-
-    ##
     # Print the list and pipe to column for nice output. Also pad each element
     # to make them all at least 8 characters long. This is done because column
     # has issues printing strings less than 8 bytes.
-    printf "%-8s\n" "${list[@]}" | column
+    _cdc_repo_list "$debug" | while IFS= read -r list; do
+        printf "%-8s\n" "$list"
+    done | column
 }
 
 ##
@@ -394,11 +401,15 @@ _cdc_list_available_dirs() {
 # @return void
 _cdc_list_ignored_dirs() {
     local debug="$1"
-    local cdc_ignore=($( _cdc_parse_colon_string "$CDC_IGNORE" ))
+    local cdc_ignore_count=0
 
     ##
     # If the ignore array is empty, return.
-    if (( ${#cdc_ignore[@]} == 0 )); then
+    while IFS= read -r cdc_ignore; do
+        (( cdc_ignore_count++ ))
+    done < <(_cdc_parse_colon_string "$CDC_IGNORE")
+
+    if (( cdc_ignore_count == 0 )); then
         if [[ $debug == true ]]; then
             _cdc_print 'warn' 'No directories are being ignored.' $debug
         fi
@@ -407,7 +418,7 @@ _cdc_list_ignored_dirs() {
             _cdc_print 'success' 'Listing ignored directories.' $debug
         fi
 
-        printf "%s\n" "${cdc_ignore[@]}" | column
+        _cdc_parse_colon_string "$CDC_IGNORE" | column
     fi
 }
 
@@ -436,26 +447,20 @@ _cdc_history_toggle() {
 
     ##
     # Flip the last two elements of the array.
-    # HACK: When you unset an element in an array, it still exists; it's just
-    # null, so you have to re-declare the array.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
     cdc_next_to_last_index=$(_cdc_array_next_to_last_index "${#CDC_HISTORY[@]}")
     cdc_last_element=${CDC_HISTORY[$cdc_last_index]}
     cdc_next_to_last_element=${CDC_HISTORY[$cdc_next_to_last_index]}
-    unset "CDC_HISTORY[$cdc_last_index]"
-    CDC_HISTORY=(${CDC_HISTORY[@]})
-    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    unset "CDC_HISTORY[$cdc_last_index]"
     CDC_HISTORY=(
-        ${CDC_HISTORY[@]}
-        $cdc_last_element
-        $cdc_next_to_last_element
+        "${CDC_HISTORY[@]:0:$((${#CDC_HISTORY[@]} - 2))}"
+        "$cdc_last_element"
+        "$cdc_next_to_last_element"
     )
 
     ##
     # Finally, cd to the last directory in the stack.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    cd ${CDC_HISTORY[$cdc_last_index]}
+    cd "${CDC_HISTORY[$cdc_last_index]}"
     return 0
 }
 
@@ -481,8 +486,8 @@ _cdc_history_list() {
 
     ##
     # Print the array.
-    for cdc_history in ${CDC_HISTORY[@]}; do
-        printf "${cdc_history##*/} "
+    for cdc_history in "${CDC_HISTORY[@]}"; do
+        printf "%s " "${cdc_history##*/}"
     done
     echo
 }
@@ -510,7 +515,7 @@ _cdc_history_current() {
     ##
     # cd to the root of the last repository in the history.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    cd ${CDC_HISTORY[$cdc_last_index]}
+    cd "${CDC_HISTORY[$cdc_last_index]}"
     return 0
 }
 
@@ -538,17 +543,13 @@ _cdc_history_pop() {
     fi
 
     ##
-    # Unset the last element of the array, then re-declare it.
-    # HACK: Again, this feels awful, but I can't get it to work for both bash
-    # and zsh unless I do something like this.
-    cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    unset "CDC_HISTORY[$cdc_last_index]"
-    CDC_HISTORY=(${CDC_HISTORY[@]})
+    # Remove the last element of the array.
+    CDC_HISTORY=("${CDC_HISTORY[@]:0:$((${#CDC_HISTORY[@]} - 1))}")
 
     ##
     # cd to the previous directory in the stack.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    cd ${CDC_HISTORY[$cdc_last_index]}
+    cd "${CDC_HISTORY[$cdc_last_index]}"
     return 0
 }
 
@@ -596,11 +597,10 @@ _cdc_find_dir() {
     local repos_only="$3"
     local debug="$4"
     local dir
-    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
 
     ##
     # Loop through every element in $cdc_dirs.
-    for dir in ${cdc_dirs[@]}; do
+    while IFS= read -r dir; do
 
         ##
         # If a directory is in the $cdc_dirs array, but the directory doesn't
@@ -643,7 +643,7 @@ _cdc_find_dir() {
         # so we print it for the caller.
         echo "$dir/$cd_dir"
         return 0
-    done
+    done < <(_cdc_parse_colon_string "$CDC_DIRS")
 
     return 2
 }
@@ -691,17 +691,16 @@ _cdc_resolve_subdir() {
 _cdc_is_excluded_dir() {
     local element
     local string="$1"
-    local cdc_ignore=($( printf "%s\n" "${CDC_IGNORE//:/ }" ))
 
     ##
     # If $cdc_ignore isn't defined or is empty, return "false".
-    if [[ -z $cdc_ignore ]] || (( ${#cdc_ignore[@]} == 0 )); then
+    if [[ -z $CDC_IGNORE ]]; then
         return 1
     fi
 
     ##
     # Loop through each element of $CDC_IGNORE array.
-    for element in "${cdc_ignore[@]}"; do
+    while IFS= read -r element; do
 
         ##
         # If the element matches the passed string, return "true" to indicate
@@ -709,7 +708,7 @@ _cdc_is_excluded_dir() {
         if [[ ${element/\//} == ${string/\//} ]]; then
             return 0
         fi
-    done
+    done < <(_cdc_parse_colon_string "$CDC_IGNORE")
 
     ##
     # If nothing matched, return "false".
@@ -727,11 +726,10 @@ _cdc_repo_list() {
     local fulldir
     local directories=()
     local debug=${1:-false}
-    local cdc_dirs=($( printf "%s\n" "${CDC_DIRS//:/ }" ))
 
     ##
     # Loop through all elements of $cdc_dirs array.
-    for dir in "${cdc_dirs[@]}"; do
+    while IFS= read -r dir; do
 
         ##
         # If the element isn't a directory that exists, move on.
@@ -746,6 +744,7 @@ _cdc_repo_list() {
         ##
         # Loop through all subdirectories in the directory.
         for fulldir in "$dir"/*/; do
+            [[ -d $fulldir ]] || continue
 
             ##
             # Remove trailing slash from directory.
@@ -767,11 +766,11 @@ _cdc_repo_list() {
                 directories+=("$subdir")
             fi
         done
-    done
+    done < <(_cdc_parse_colon_string "$CDC_DIRS")
 
     ##
     # "Return" the array.
-    echo "${directories[@]}"
+    printf "%s\n" "${directories[@]}"
 }
 
 ##
@@ -879,9 +878,8 @@ _cdc_completion_repo_list() {
     local dir
     local fulldir
     local subdir
-    local cdc_dirs=($( _cdc_parse_colon_string "$CDC_DIRS" ))
 
-    for dir in "${cdc_dirs[@]}"; do
+    while IFS= read -r dir; do
         [[ -d $dir ]] || continue
 
         for fulldir in "$dir"/*/; do
@@ -900,7 +898,7 @@ _cdc_completion_repo_list() {
 
             echo "$subdir"
         done
-    done
+    done < <(_cdc_parse_colon_string "$CDC_DIRS")
 }
 
 ##
@@ -981,7 +979,8 @@ _cdc_is_repo_dir() {
     local repo_markers
 
     if [[ -n $CDC_REPO_MARKERS ]]; then
-        repo_markers=($( printf "%s\n" "${CDC_REPO_MARKERS//:/ }" ))
+        local IFS=$'\n'
+        repo_markers=($( _cdc_parse_colon_string "$CDC_REPO_MARKERS" ))
     else
         repo_markers=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
     fi
@@ -989,7 +988,7 @@ _cdc_is_repo_dir() {
 
     ##
     # Spin through all known repository markers.
-    for marker in ${repo_markers[@]}; do
+    for marker in "${repo_markers[@]}"; do
 
         ##
         # Repo identifier is the passed directory plus the known marker.
@@ -1023,7 +1022,7 @@ _cdc_print() {
     ##
     # If we're not debugging, just print the message and return.
     if [[ $debug == false ]]; then
-        echo $message
+        printf "%s\n" "$message"
         return
     fi
 

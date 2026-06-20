@@ -72,6 +72,28 @@ setup() {
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
 }
 
+@test "cdc supports repo roots and repo names with spaces" {
+    cdc -w "repo with space" >"$BATS_TEST_TMPDIR/space-repo.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/space-repo.out" "$CDC_FIXTURE/one/repo with space"
+
+    cdc "repo with space/bin"
+
+    [ "$PWD" = "$CDC_FIXTURE/one/repo with space/bin" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo with space" ]
+}
+
+@test "cdc handles ignored names with spaces" {
+    export CDC_IGNORE="ignored:ignored with space"
+
+    run cdc -w "ignored with space"
+    assert_failure_status 2
+    [ "$output" = "[ignored with space] not found." ]
+
+    cdc -a -w "ignored with space" >"$BATS_TEST_TMPDIR/ignored-space.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/ignored-space.out" "$CDC_FIXTURE/two/ignored with space"
+}
+
 @test "history pop changes to the previous directory" {
     cdc repo
     cdc plain
@@ -95,12 +117,12 @@ setup() {
 
 @test "history list prints repository base names" {
     cdc repo
-    cdc plain
+    cdc "repo with space"
 
     run cdc -d
 
     assert_success
-    [ "$output" = "repo plain " ]
+    [ "$output" = "repo repo with space " ]
 }
 
 @test "list options print configured directories" {
@@ -155,6 +177,21 @@ setup() {
     assert_output_contains "cdc is a function"
 }
 
+@test "bash plugin wrapper loads cdc from a plugin directory with spaces" {
+    PLUGIN_WITH_SPACE="$BATS_TEST_TMPDIR/plugin with space"
+    export PLUGIN_WITH_SPACE
+    mkdir -p "$PLUGIN_WITH_SPACE"
+    cp "$CDC_PROJECT_ROOT/cdc.sh" "$CDC_PROJECT_ROOT/cdc.plugin.bash" "$PLUGIN_WITH_SPACE"
+
+    run bash -c '
+        source "$PLUGIN_WITH_SPACE/cdc.plugin.bash"
+        type cdc
+    '
+
+    assert_success
+    assert_output_contains "cdc is a function"
+}
+
 @test "bash completion completes cdc subdirectories" {
     export CDC_PROJECT_ROOT
 
@@ -169,6 +206,22 @@ setup() {
 
     assert_success
     assert_output_contains "repo/bin"
+}
+
+@test "bash completion preserves candidates with spaces" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc "repo with")
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains "repo with space"
 }
 
 @test "bash completion applies directory-affecting flags" {
@@ -242,6 +295,32 @@ setup() {
 
     assert_success
     assert_output_contains "repo/bin"
+}
+
+@test "zsh completion preserves candidates with spaces" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            local arg
+            for arg in "$@"; do
+                case "$arg" in
+                    -S|--|"") continue ;;
+                    *) print -r -- "$arg" ;;
+                esac
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc "repo with")
+        CURRENT=2
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains "repo with space"
 }
 
 @test "zsh completion applies directory-affecting flags" {
