@@ -269,6 +269,22 @@ setup() {
     assert_output_contains "cdc: function"
 }
 
+@test "zsh plugin wrapper bootstraps vanilla completion" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -f -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+        whence -w cdc
+        whence -w compdef
+        print -r -- "$_comps[cdc]"
+    '
+
+    assert_success
+    assert_output_contains "cdc: function"
+    assert_output_contains "compdef: function"
+    assert_output_contains "_cdc"
+}
+
 @test "bash plugin wrapper loads cdc" {
     export CDC_PROJECT_ROOT
 
@@ -279,6 +295,38 @@ setup() {
 
     assert_success
     assert_output_contains "cdc is a function"
+}
+
+@test "bash plugin wrapper loads with nounset enabled" {
+    export CDC_PROJECT_ROOT
+
+    run bash -u -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+        type cdc
+        complete -p cdc
+    '
+
+    assert_success
+    assert_output_contains "cdc is a function"
+    assert_output_contains "complete -o nospace -F _cdc_complete cdc"
+}
+
+@test "bash-it plugin wrapper registers metadata when helpers are available" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        BASH_IT=/tmp/bash-it
+        cite() { printf "cite:%s\n" "$1"; }
+        about-plugin() { printf "about:%s\n" "$1"; }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+        complete -p cdc
+    '
+
+    assert_success
+    assert_output_contains "cite:about-plugin"
+    assert_output_contains "about:\`cd\` to directories from anywhere without changing \$CDPATH"
+    assert_output_contains "complete -o nospace -F _cdc_complete cdc"
 }
 
 @test "bash plugin wrapper loads cdc from a plugin directory with spaces" {

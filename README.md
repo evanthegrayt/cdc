@@ -5,29 +5,6 @@
 View on [GitHub](https://github.com/evanthegrayt/cdc) |
 [GitHub Pages](https://evanthegrayt.github.io/cdc/)
 
-# Version Update!
-Note that `cdc` was recently updated with breaking changes. If you're
-experiencing issues, please check [this section](#telling-cdc-where-to-look) of
-the docs, and ensure you're declaring your variables correctly.
-
-In short, the `CDC_DIRS`, `CDC_IGNORE`, and `CDC_REPO_MARKERS` used to be
-declared as arrays, but you can't export environmental variables as arrays; they
-must be a string. So if your variables looked like this:
-
-```sh
-export CDC_DIRS=(/home/user/one /home/user/two)
-export CDC_IGNORE=(notes_directory training)
-export CDC_REPO_MARKERS=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
-```
-
-...they should now look like this -- a string separated by colons, like `$PATH`:
-
-```sh
-export CDC_DIRS=/home/user/one:/home/user/two
-export CDC_IGNORE=notes_directory:training
-export CDC_REPO_MARKERS=.git/:.git:Rakefile:Makefile:.hg/:.bzr/:.svn/
-```
-
 ## About
 ### Overview
 I have a few directories in which I clone repositories, so hopping from one
@@ -100,6 +77,11 @@ files, such as `~/.zshrc` or `~/.bashrc`, respectively.
 source $INSTALLATION_PATH/cdc.plugin.zsh  # in ~/.zshrc
 source $INSTALLATION_PATH/cdc.plugin.bash # in ~/.bashrc
 ```
+
+The `zsh` plugin does not require oh-my-zsh. It registers completion with
+zsh's built-in `compdef`; if your shell configuration has not already loaded
+the completion system with `compinit`, the plugin initializes it before
+registering `cdc`.
 
 If you're using a version of `zsh`/`bash` that doesn't support the completion
 features, or you just don't want to use them, just source the `cdc.sh` file
