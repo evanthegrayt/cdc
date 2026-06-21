@@ -43,6 +43,10 @@ I don't like this method either, as it just pollutes your environment. In my
 opinion, the fewer aliases, the better. Also, you now have to remember an alias
 for each repository. `cdc` solves this issue with its tab-completion.
 
+An added benefit is that variables are exported to your shell, which means you
+can use it in scripts and other plugins. For example, I wrote a custom
+[integration with vim](#vim) that makes use of the exported `CDC_DIRS` variable.
+
 ### Why the name "cdc"?
 I wanted something fast to type that wasn't already a command or builtin. You
 already type `cd` a million times a day, and you don't even have to move your
@@ -95,7 +99,8 @@ source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
 The following settings require variables to be exported from a shell config
 file, such as `~/.zshrc` or `~/.bashrc`. `cdc` does not read a separate
 `~/.cdcrc` file. You can view an example of this in [my config
-file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/shellrc#L27).
+$HOME/.vim/pack/public-strategies/opt
+file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/shellrc#L30).
 
 ### Telling cdc where to look
 To use this plugin, you need to `export CDC_DIRS` in a shell config file. It
@@ -227,6 +232,41 @@ create their own temporary fixtures and shell configuration.
 ```sh
 ./test/run.sh
 ```
+
+## Vim
+While there is no official `vim` support, I do have a very simple script that
+works in vim. It does not use the `cdc` function itself, but it does make use of
+the exported `CDC_DIRS` environmental variable.
+If you want to use it, add it to your vimrc file or something like
+`~/.vim/plugin.vim`.
+
+```vim
+command! -nargs=1 -complete=custom,<SID>CdcCompletion Cdc
+      \ call <SID>CdcChangeDirectory(<f-args>)
+
+function! s:CdcChangeDirectory(directory) abort
+  for l:dir in split($CDC_DIRS, ':')
+    let l:path = l:dir . '/' . a:directory
+    if isdirectory(l:path)
+      execute "chdir" . l:path
+      return
+    endif
+  endfor
+  echo "Directory " . l:dir . " not found in $CDC_DIRS"
+endfunction
+
+function! s:CdcCompletion(...) abort
+  let l:dirs = []
+  for l:dir in g:cdc_dirs
+    call add(l:dirs, map(
+          \   glob(l:dir . '/*', 0, 1), "substitute(v:val, l:dir . '/', '', '')"
+          \ ))
+  endfor
+  return join(sort(flatten(l:dirs)), "\n")
+endfunction
+```
+
+You should then be able to call `:Cdc [DIRECTORY]` with tab-completion.
 
 ## Reporting bugs
 If you have an idea or find a bug, please [create an
