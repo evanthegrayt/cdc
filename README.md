@@ -195,6 +195,9 @@ print a message to `stderr`.
 The plugin comes with a few available options. Some are for dealing with the
 directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
 overriding variables set in a shell config file. There's also a debug mode.
+Options that change a directory lookup can be combined, such as `-aRw` or
+`-PU`. Standalone action options (`-l`, `-L`, `-i`, `-d`, `-n`, `-t`, `-p`, and
+`-h`) should be used one at a time, without a directory argument.
 
 |Flag|What it does|
 |:------|:-----------|

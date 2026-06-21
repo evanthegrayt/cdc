@@ -45,6 +45,30 @@ setup() {
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/two" ]
 }
 
+@test "directory lookup options can be combined" {
+    export CDC_REPOS_ONLY=true
+
+    cdc -RU plain
+
+    [ "$PWD" = "$CDC_FIXTURE/two/plain" ]
+    [ "${#CDC_HISTORY[@]}" -eq 0 ]
+
+    cd "$CDC_FIXTURE/start"
+    cdc -Paw two/ignored >"$BATS_TEST_TMPDIR/parent-which.out"
+
+    assert_file_equals "$BATS_TEST_TMPDIR/parent-which.out" "$CDC_FIXTURE/two/ignored"
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+}
+
+@test "repo-only overrides honor flag order in combined options" {
+    cdc -rRw plain >"$BATS_TEST_TMPDIR/plain-rR.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/plain-rR.out" "$CDC_FIXTURE/two/plain"
+
+    run cdc -Rrw plain
+    assert_failure_status 2
+    [ "$output" = "[plain] not found." ]
+}
+
 @test "cdc respects ignored directories unless -a is passed" {
     run cdc -w ignored
     assert_failure_status 2
@@ -159,6 +183,20 @@ setup() {
     assert_output_contains "custom"
 }
 
+@test "standalone options reject directories and other action flags" {
+    run cdc -l repo
+    assert_failure_status 1
+    assert_output_contains "Standalone options do not accept a directory."
+
+    run cdc -ld
+    assert_failure_status 1
+    assert_output_contains "Use only one standalone option at a time."
+
+    run cdc -lw
+    assert_failure_status 1
+    assert_output_contains "Standalone options cannot be combined with directory options."
+}
+
 @test "cdc -i works with errexit enabled" {
     export CDC_PROJECT_ROOT
     export CDC_FIXTURE
@@ -182,6 +220,15 @@ setup() {
     assert_output_contains "cd to a configured parent directory"
     assert_output_contains "-R"
     assert_output_contains "cd to any directory, even if it is not a repository"
+}
+
+@test "help does not require CDC_DIRS" {
+    unset CDC_DIRS
+
+    run cdc -h
+
+    assert_success
+    assert_output_contains "USAGE: cdc [OPTION] [DIRECTORY]"
 }
 
 @test "cdc requires CDC_DIRS" {
@@ -222,7 +269,8 @@ setup() {
 }
 
 @test "cdc does not leak internal variables" {
-    unset opt wdir cd_dir subdir use_color pushdir repos_only CDC_RESET
+    unset opt wdir cd_dir subdir use_color pushdir repos_only
+    unset terminal_action_count has_directory_modifier CDC_RESET
     unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
 
     cdc -w repo >/dev/null
@@ -235,6 +283,8 @@ setup() {
     [ -z "${use_color+x}" ]
     [ -z "${pushdir+x}" ]
     [ -z "${repos_only+x}" ]
+    [ -z "${terminal_action_count+x}" ]
+    [ -z "${has_directory_modifier+x}" ]
     [ -z "${CDC_RESET+x}" ]
     [ -z "${CDC_SUCCESS_COLOR+x}" ]
     [ -z "${CDC_WARNING_COLOR+x}" ]

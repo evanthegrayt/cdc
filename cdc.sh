@@ -23,6 +23,8 @@ cdc() {
     local cdc_list_ignored=false
     local cdc_parent_dirs=false
     local print_help=false
+    local terminal_action_count=0
+    local has_directory_modifier=false
     local use_color=${CDC_COLOR:-true}
     local CDC_ERROR_COLOR="$CDC_ERROR_COLOR"
     local CDC_SUCCESS_COLOR="$CDC_SUCCESS_COLOR"
@@ -48,7 +50,10 @@ cdc() {
 
             ##
             # -a: Allow cd-ing to ignored directories.
-            a) allow_ignored=true ;;
+            a)
+                allow_ignored=true
+                has_directory_modifier=true
+                ;;
 
             ##
             # -c: Enable color.
@@ -60,51 +65,87 @@ cdc() {
 
             ##
             # -n: cd to the root of the current repository in the stack.
-            n) cdc_current=true ;;
+            n)
+                cdc_current=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # -l: List the directories that are cdc-able.
-            l) cdc_list_dirs=true ;;
+            l)
+                cdc_list_dirs=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # -i: List the directories that are ignored.
-            i) cdc_list_ignored=true ;;
+            i)
+                cdc_list_ignored=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # -L: List the directories that are searched.
-            L) cdc_list_searched_dirs=true ;;
+            L)
+                cdc_list_searched_dirs=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # -t: cd to the last repo, but don't add it to the stack.
-            t) cdc_toggle=true ;;
+            t)
+                cdc_toggle=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # -d: List cdc history.
-            d) cdc_show_history=true ;;
+            d)
+                cdc_show_history=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # -p: cd to the last element in the stack and pop it from the array.
-            p) cdc_pop=true ;;
+            p)
+                cdc_pop=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # -P: cd to a configured parent directory.
-            P) cdc_parent_dirs=true ;;
+            P)
+                cdc_parent_dirs=true
+                has_directory_modifier=true
+                ;;
 
             ##
             # -r: Force cdc to only cd to repositories.
-            r) repos_only=true ;;
+            r)
+                repos_only=true
+                has_directory_modifier=true
+                ;;
 
             ##
             # -R: Force cdc to NOT only cd to repositories.
-            R) repos_only=false ;;
+            R)
+                repos_only=false
+                has_directory_modifier=true
+                ;;
 
             ##
             # -u: Push the directory onto the history stack.
-            u) pushdir=true ;;
+            u)
+                pushdir=true
+                has_directory_modifier=true
+                ;;
 
             ##
             # -U: Do not push the directory onto the history stack.
-            U) pushdir=false ;;
+            U)
+                pushdir=false
+                has_directory_modifier=true
+                ;;
 
             ##
             # -D: Debug
@@ -112,11 +153,17 @@ cdc() {
 
             ##
             # -w: Only display the repo's location, like which for executables.
-            w) which=true ;;
+            w)
+                which=true
+                has_directory_modifier=true
+                ;;
 
             ##
             # -h: Print the help.
-            h) print_help=true ;;
+            h)
+                print_help=true
+                (( terminal_action_count += 1 ))
+                ;;
 
             ##
             # If the option isn't supported, tell the user and exit.
@@ -157,17 +204,33 @@ cdc() {
         _cdc_print_debug_env
     fi
 
-    ##
-    # Check for the required variables that should be exported from a shell
-    # config file. If not found, exit with a non-zero return code.
-    if [[ -z $CDC_DIRS ]]; then
-        _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
+    if (( terminal_action_count > 1 )); then
+        _cdc_print 'error' 'Use only one standalone option at a time.' $debug
+        return 1
+    fi
+
+    if (( terminal_action_count == 1 )) && [[ $has_directory_modifier == true ]]; then
+        _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $debug
+        return 1
+    fi
+
+    if (( terminal_action_count == 1 )) && (( $# != 0 )); then
+        _cdc_print 'error' 'Standalone options do not accept a directory.' $debug
+        _cdc_print 'error' '  Use `-h` for more help' $debug
         return 1
     fi
 
     if [[ $print_help == true ]]; then
         _cdc_print_help
         return 0
+    fi
+
+    ##
+    # Check for the required variables that should be exported from a shell
+    # config file. If not found, exit with a non-zero return code.
+    if [[ -z $CDC_DIRS ]]; then
+        _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
+        return 1
     fi
 
     if [[ $cdc_list_searched_dirs == true ]]; then
