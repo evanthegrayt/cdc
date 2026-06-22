@@ -383,11 +383,32 @@ setup() {
     PLUGIN_WITH_SPACE="$BATS_TEST_TMPDIR/plugin with space"
     export PLUGIN_WITH_SPACE
     mkdir -p "$PLUGIN_WITH_SPACE"
-    cp "$CDC_PROJECT_ROOT/cdc.sh" "$CDC_PROJECT_ROOT/cdc.plugin.bash" "$PLUGIN_WITH_SPACE"
+    cp \
+        "$CDC_PROJECT_ROOT/cdc.sh" \
+        "$CDC_PROJECT_ROOT/cdc.completion.sh" \
+        "$CDC_PROJECT_ROOT/cdc.plugin.bash" \
+        "$PLUGIN_WITH_SPACE"
 
     run bash -c '
         source "$PLUGIN_WITH_SPACE/cdc.plugin.bash"
         type cdc
+    '
+
+    assert_success
+    assert_output_contains "cdc is a function"
+}
+
+@test "sourcing cdc.sh directly does not load completion helpers" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.sh"
+
+        type cdc
+        if declare -F _cdc_completion_list >/dev/null; then
+            printf "_cdc_completion_list was loaded\n"
+            exit 1
+        fi
     '
 
     assert_success
