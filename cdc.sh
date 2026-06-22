@@ -1099,29 +1099,160 @@ _cdc_completion_parent_list() {
 }
 
 ##
+# Downcase a value for completion-only matching.
+#
+# @param string $value
+# @return string
+_cdc_completion_downcase() {
+    printf "%s" "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+##
+# Return success when a completion candidate matches the current word, ignoring case.
+#
+# @param string $current
+# @param string $candidate
+# @return boolean
+_cdc_completion_matches_current() {
+    local current
+    local candidate
+
+    current=$(_cdc_completion_downcase "$1")
+    candidate=$(_cdc_completion_downcase "$2")
+
+    [[ $candidate == "$current"* ]]
+}
+
+##
+# Return success when a completion candidate equals the current word, ignoring case.
+#
+# @param string $current
+# @param string $candidate
+# @return boolean
+_cdc_completion_matches_exact() {
+    local current
+    local candidate
+
+    current=$(_cdc_completion_downcase "$1")
+    candidate=$(_cdc_completion_downcase "$2")
+
+    [[ $candidate == "$current" ]]
+}
+
+##
+# Filter completion candidates against the current word, ignoring case.
+#
+# @param string $current
+# @return string
+_cdc_completion_filter() {
+    local current="$1"
+    local candidate
+
+    while IFS= read -r candidate; do
+        if _cdc_completion_matches_current "$current" "$candidate"; then
+            echo "$candidate"
+        fi
+    done
+}
+
+##
+# Print the first candidate that exactly matches the current word, ignoring case.
+#
+# @param string $current
+# @return string
+_cdc_completion_select_match() {
+    local current="$1"
+    local candidate
+
+    while IFS= read -r candidate; do
+        if _cdc_completion_matches_exact "$current" "$candidate"; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    return 2
+}
+
+##
+# Resolve a typed subdirectory path to its on-disk casing for completion.
+#
+# @param string $base_dir
+# @param string $subdir_path
+# @return string
+_cdc_completion_resolve_case_path() {
+    local base_dir="$1"
+    local subdir_path="$2"
+    local resolved="$base_dir"
+    local remaining="$subdir_path"
+    local segment
+    local fulldir
+    local fulldir_name
+    local candidate
+
+    while [[ -n $remaining ]]; do
+        if [[ $remaining == */* ]]; then
+            segment="${remaining%%/*}"
+            remaining="${remaining#*/}"
+        else
+            segment="$remaining"
+            remaining=""
+        fi
+
+        [[ -n $segment ]] || continue
+
+        candidate=""
+        for fulldir in "$resolved"/*/; do
+            [[ -d $fulldir ]] || continue
+
+            fulldir_name=${fulldir%/}
+            fulldir_name=${fulldir_name##*/}
+
+            if _cdc_completion_matches_exact "$segment" "$fulldir_name"; then
+                candidate="${fulldir%/}"
+                break
+            fi
+        done
+
+        [[ -n $candidate ]] || return 2
+        resolved="$candidate"
+    done
+
+    echo "$resolved"
+}
+
+##
 # List subdirectories under a matched cdc root for completion.
 #
+# @param string $current
 # @param string $cd_dir
 # @param string $wdir
 # @param string $partial_subdir
 # @return string
 _cdc_completion_subdir_list() {
-    local cd_dir="$1"
-    local wdir="$2"
-    local partial_subdir="$3"
+    local current="$1"
+    local cd_dir="$2"
+    local wdir="$3"
+    local partial_subdir="$4"
+    local root_dir
     local parent
     local search_dir
     local candidate_prefix
     local fulldir
     local subdir
+    local candidate
 
     if [[ $partial_subdir == */* ]]; then
         parent="${partial_subdir%/*}"
-        search_dir="$wdir/$parent"
-        candidate_prefix="$cd_dir/$parent/"
+        search_dir=$(_cdc_completion_resolve_case_path "$wdir" "$parent") || return 0
+        root_dir=${wdir%/}
+        root_dir=${root_dir##*/}
+        candidate_prefix="$root_dir/${search_dir#"$wdir"/}/"
     else
         search_dir="$wdir"
-        candidate_prefix="$cd_dir/"
+        root_dir=${wdir%/}
+        root_dir=${root_dir##*/}
+        candidate_prefix="$root_dir/"
     fi
 
     [[ -d $search_dir ]] || return 0
@@ -1131,7 +1262,11 @@ _cdc_completion_subdir_list() {
 
         subdir=${fulldir%/}
         subdir=${subdir##*/}
-        echo "$candidate_prefix$subdir"
+        candidate="$candidate_prefix$subdir"
+
+        if _cdc_completion_matches_current "$current" "$candidate"; then
+            echo "$candidate"
+        fi
     done
 }
 
@@ -1157,23 +1292,29 @@ _cdc_completion_list() {
         subdir="${current#*/}"
 
         if [[ $parent_dirs == true ]]; then
+            cd_dir=$(_cdc_completion_parent_list "$allow_ignored" \
+                | _cdc_completion_select_match "$cd_dir") || return 0
             wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" false)
         else
+            cd_dir=$(_cdc_completion_repo_list "$allow_ignored" "$repos_only" \
+                | _cdc_completion_select_match "$cd_dir") || return 0
             wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" false)
         fi
 
         (( $? == 0 )) || return 0
 
-        _cdc_completion_subdir_list "$cd_dir" "$wdir" "$subdir"
+        _cdc_completion_subdir_list "$current" "$cd_dir" "$wdir" "$subdir"
         return 0
     fi
 
     if [[ $parent_dirs == true ]]; then
-        _cdc_completion_parent_list "$allow_ignored"
+        _cdc_completion_parent_list "$allow_ignored" \
+            | _cdc_completion_filter "$current"
         return 0
     fi
 
-    _cdc_completion_repo_list "$allow_ignored" "$repos_only"
+    _cdc_completion_repo_list "$allow_ignored" "$repos_only" \
+        | _cdc_completion_filter "$current"
 }
 
 ##

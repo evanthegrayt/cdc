@@ -426,6 +426,27 @@ setup() {
     assert_output_contains "repo with space"
 }
 
+@test "bash completion matches directories case-insensitively" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc l)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+
+        COMP_WORDS=(cdc mixedcase/)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains "MixedCase/bin"
+}
+
 @test "bash completion does not leak internal variables" {
     export CDC_PROJECT_ROOT
 
@@ -522,12 +543,17 @@ setup() {
     run zsh -c '
         compdef() { :; }
         compadd() {
-            local arg
-            for arg in "$@"; do
-                case "$arg" in
-                    -S|--|"") continue ;;
-                    *) print -r -- "$arg" ;;
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
                 esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
             done
         }
 
@@ -548,12 +574,17 @@ setup() {
     run zsh -c '
         compdef() { :; }
         compadd() {
-            local arg
-            for arg in "$@"; do
-                case "$arg" in
-                    -S|--|"") continue ;;
-                    *) print -r -- "$arg" ;;
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
                 esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
             done
         }
 
@@ -566,6 +597,41 @@ setup() {
 
     assert_success
     assert_output_contains "repo with space"
+}
+
+@test "zsh completion matches directories case-insensitively" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
+                esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc l)
+        CURRENT=2
+        _cdc
+
+        words=(cdc mixedcase/)
+        CURRENT=2
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains "MixedCase/bin"
 }
 
 @test "zsh completion does not leak internal variables" {
@@ -600,12 +666,17 @@ setup() {
     run zsh -c '
         compdef() { :; }
         compadd() {
-            local arg
-            for arg in "$@"; do
-                case "$arg" in
-                    -S|--|"") continue ;;
-                    *) print -r -- "$arg" ;;
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
                 esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
             done
         }
 
@@ -624,12 +695,17 @@ setup() {
     run zsh -c '
         compdef() { :; }
         compadd() {
-            local arg
-            for arg in "$@"; do
-                case "$arg" in
-                    -S|--|"") continue ;;
-                    *) print -r -- "$arg" ;;
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
                 esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
             done
         }
 
@@ -650,12 +726,17 @@ setup() {
     run zsh -c '
         compdef() { :; }
         compadd() {
-            local arg
-            for arg in "$@"; do
-                case "$arg" in
-                    -S|--|"") continue ;;
-                    *) print -r -- "$arg" ;;
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
                 esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
             done
         }
 
@@ -681,12 +762,17 @@ setup() {
     run zsh -c '
         compdef() { :; }
         compadd() {
-            local arg
-            for arg in "$@"; do
-                case "$arg" in
-                    -S|--|"") continue ;;
-                    *) print -r -- "$arg" ;;
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
                 esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
             done
         }
 

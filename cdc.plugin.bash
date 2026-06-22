@@ -66,7 +66,8 @@ _cdc_complete() {
     # Bash reads completion candidates from COMPREPLY.
     COMPREPLY=()
     while IFS= read -r candidate; do
-        [[ $candidate == "$cur"* ]] && COMPREPLY+=("$candidate")
+        [[ -n $candidate ]] || continue
+        COMPREPLY+=("$candidate")
     done <<< "$candidates"
 }
 
