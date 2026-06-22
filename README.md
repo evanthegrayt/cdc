@@ -1,4 +1,4 @@
-# $ cdc [option] [dir]
+# $ cdc
 > If your repositories are spread throughout your system like a pandemic, then
 > `cdc` is the solution!
 
@@ -39,9 +39,9 @@ Alternatively, you could make aliases:
 alias repository='cd /path/to/repo_dir/repository'
 ```
 
-I don't like this method either, as it just pollutes your environment. In my
-opinion, the fewer aliases, the better. Also, you now have to remember an alias
-for each repository. `cdc` solves this issue with its tab-completion.
+I don't like this method either. In my opinion, the fewer aliases, the better.
+Also, you now have to remember an alias for each repository. `cdc` solves this
+issue with its tab-completion.
 
 An added benefit is that variables are exported to your shell, which means you
 can use it in scripts and other plugins. For example, I wrote a custom
@@ -53,6 +53,25 @@ already type `cd` a million times a day, and you don't even have to move your
 finger to hit the <kbd>c</kbd> key again. You can't get much faster.
 
 ## Installation
+### Vanilla zsh or bash
+Clone the repository wherever you like, and source either the `cdc.plugin.zsh`
+file for `zsh`, or `cdc.plugin.bash` file for `bash`, from one of your startup
+files, such as `~/.zshrc` or `~/.bashrc`, respectively.
+
+```sh
+# Where $INSTALLATION_PATH is the path to where you installed the plugin.
+source $INSTALLATION_PATH/cdc.plugin.zsh  # in ~/.zshrc
+source $INSTALLATION_PATH/cdc.plugin.bash # in ~/.bashrc
+```
+
+If you're using a version of `zsh`/`bash` that doesn't support the completion
+features, or you just don't want to use them, just source the `cdc.sh` file
+directly.
+
+```sh
+source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
+```
+
 ### oh-my-zsh
 Clone the repository in your `$ZSH_CUSTOM/plugins` directory
 ```sh
@@ -71,35 +90,10 @@ git clone https://github.com/evanthegrayt/cdc.git $BASH_IT_CUSTOM/cdc
 Files in this directory that end with `.bash` are automatically sourced, so
 there's nothing else to do.
 
-### Vanilla zsh or bash
-Clone the repository wherever you like, and source either the `cdc.plugin.zsh`
-file for `zsh`, or `cdc.plugin.bash` file for `bash`, from one of your startup
-files, such as `~/.zshrc` or `~/.bashrc`, respectively.
-
-```sh
-# Where $INSTALLATION_PATH is the path to where you installed the plugin.
-source $INSTALLATION_PATH/cdc.plugin.zsh  # in ~/.zshrc
-source $INSTALLATION_PATH/cdc.plugin.bash # in ~/.bashrc
-```
-
-The `zsh` plugin does not require oh-my-zsh. It registers completion with
-zsh's built-in `compdef`; if your shell configuration has not already loaded
-the completion system with `compinit`, the plugin initializes it before
-registering `cdc`.
-
-If you're using a version of `zsh`/`bash` that doesn't support the completion
-features, or you just don't want to use them, just source the `cdc.sh` file
-directly.
-
-```sh
-source $INSTALLATION_PATH/cdc.sh # in either ~/.zshrc or ~/.bashrc
-```
-
 ## Set-up
 The following settings require variables to be exported from a shell config
-file, such as `~/.zshrc` or `~/.bashrc`. `cdc` does not read a separate
-`~/.cdcrc` file. You can view an example of this in [my config
-$HOME/.vim/pack/public-strategies/opt
+file, such as `~/.zshrc` or `~/.bashrc`. Note that `cdc` no longer reads a
+separate `~/.cdcrc` file. You can view an example of this in [my config
 file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/shellrc#L30).
 
 ### Telling cdc where to look
@@ -113,8 +107,8 @@ export CDC_DIRS=$HOME/dir_with_repos:$HOME/workspace/another_dir_with_repos
 ```
 
 Note that the order of the paths in the string matters. The plugin will `cd`
-to the first match it finds, so if you have the same repository -- or two
-repositories with the same name -- in two places, the first location in the
+to the first match it finds, so if you have the same repository (or two
+repositories with the same name) in two places, the first location in the
 string will take precedence. There is currently an issue to better handle this
 "feature". Not sure how I want to go about it yet. Suggestions are very much
 welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
