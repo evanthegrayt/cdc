@@ -230,33 +230,33 @@ create their own temporary fixtures and shell configuration.
 ## Vim
 While there is no official `vim` support, I do have a very simple script that
 works in vim. It does not use the `cdc` function itself, but it does make use of
-the exported `CDC_DIRS` environmental variable.
+the exported `CDC_DIRS` environment variable.
 If you want to use it, add it to your vimrc file or something like
 `~/.vim/plugin.vim`.
 
 ```vim
 command! -nargs=1 -complete=custom,<SID>CdcCompletion Cdc
-      \ call <SID>CdcChangeDirectory(<f-args>)
+      \ call <SID>CdcChangeDirectory(<q-args>)
 
 function! s:CdcChangeDirectory(directory) abort
   for l:dir in split($CDC_DIRS, ':')
     let l:path = l:dir . '/' . a:directory
     if isdirectory(l:path)
-      execute "chdir" . l:path
+      execute 'chdir' fnameescape(l:path)
       return
     endif
   endfor
-  echo "Directory " . l:dir . " not found in $CDC_DIRS"
+  echo "Directory " . a:directory . " not found in $CDC_DIRS"
 endfunction
 
 function! s:CdcCompletion(...) abort
   let l:dirs = []
-  for l:dir in g:cdc_dirs
-    call add(l:dirs, map(
+  for l:dir in split($CDC_DIRS, ':')
+    call extend(l:dirs, map(
           \   glob(l:dir . '/*', 0, 1), "substitute(v:val, l:dir . '/', '', '')"
           \ ))
   endfor
-  return join(sort(flatten(l:dirs)), "\n")
+  return join(sort(l:dirs), "\n")
 endfunction
 ```
 
@@ -276,4 +276,4 @@ after reading the manual, you still have problems, feel free to submit an issue.
 ## Self-Promotion
 I do these projects for fun, and I enjoy knowing that they're helpful to people.
 Consider starring [the repository](https://github.com/evanthegrayt/cdc) if you
-like it! If you love it, follow me [on github](https://github.com/evanthegrayt)!
+like it! If you love it, follow me [on GitHub](https://github.com/evanthegrayt)!
