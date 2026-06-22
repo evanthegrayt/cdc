@@ -5,6 +5,7 @@
 # Source the plugin and completion functions.
 # In zsh, ${0:h} expands to the directory containing this sourced file.
 source "${0:h}/cdc.sh"
+source "${0:h}/cdc.completion.sh"
 
 ##
 # Load zsh's completion system when a framework has not already done so.
