@@ -70,8 +70,8 @@ _cdc() {
   # Keep each newline-separated candidate as a single completion entry.
   candidates=("${(@f)$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only" "$parent_dirs")}")
 
-  # -S '' prevents zsh from appending a space after the completed directory.
-  (( ${#candidates[@]} )) && compadd -S '' -- "${candidates[@]}"
+  # -M makes matching case-insensitive; -S '' prevents an appended space.
+  (( ${#candidates[@]} )) && compadd -M 'm:{a-zA-Z}={A-Za-z}' -S '' -- "${candidates[@]}"
 }
 
 ##

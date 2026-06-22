@@ -11,6 +11,8 @@ setup_cdc_fixture() {
     mkdir -p "$CDC_HOME"
     mkdir -p "$CDC_FIXTURE/one/repo/.git"
     mkdir -p "$CDC_FIXTURE/one/repo/bin"
+    mkdir -p "$CDC_FIXTURE/one/MixedCase/.git"
+    mkdir -p "$CDC_FIXTURE/one/MixedCase/bin"
     mkdir -p "$CDC_FIXTURE/one/repo with space/.git"
     mkdir -p "$CDC_FIXTURE/one/repo with space/bin"
     mkdir -p "$CDC_FIXTURE/two/repo/.git"
