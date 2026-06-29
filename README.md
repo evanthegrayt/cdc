@@ -273,7 +273,10 @@ for your shell
 / [zsh](http://zsh.sourceforge.net/Doc/Release/Completion-System.html)). If,
 after reading the manual, you still have problems, feel free to submit an issue.
 
-## Self-Promotion
-I do these projects for fun, and I enjoy knowing that they're helpful to people.
-Consider starring [the repository](https://github.com/evanthegrayt/cdc) if you
-like it! If you love it, follow me [on GitHub](https://github.com/evanthegrayt)!
+## Support this project
+I love knowing when people find my work useful! 
+
+:star: Like the project? Consider starring [the
+repository](https://github.com/evanthegrayt/cdc).\
+:heart: Love the project? Follow me [on GitHub](https://github.com/evanthegrayt).\
+:money_with_wings: *Really* love it? Consider [buying me a tea](https://paypal.me/evanrgray)!
