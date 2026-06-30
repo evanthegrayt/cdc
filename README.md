@@ -158,6 +158,14 @@ it to the stack with the `-U` option. See [options](#options) below.
 Using `-w` only prints a directory path and does not push anything onto the
 history stack.
 
+You can also push the current directory onto the stack with `cdc .`. This does
+not change directories. It still pushes when `CDC_AUTO_PUSH` is `false`, because
+`.` is an explicit request to push the current directory. Use `cdc -U .` to skip
+the push (which becomes a no-op), or `cdc -w .` to print the resolved path
+without pushing. When `CDC_REPOS_ONLY` is `true`, `cdc .` pushes the nearest
+parent repository if one is found; otherwise, it pushes the current directory.
+Directories pushed this way are not added to tab-completion.
+
 ### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
 adding the following lines to a shell config file.

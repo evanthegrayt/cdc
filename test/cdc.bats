@@ -29,6 +29,67 @@ setup() {
     [ "${#CDC_HISTORY[@]}" -eq 0 ]
 }
 
+@test "cdc . pushes the current directory without changing directories" {
+    cdc .
+
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/start" ]
+}
+
+@test "cdc . pushes even when auto push is disabled" {
+    export CDC_AUTO_PUSH=false
+
+    cdc .
+
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/start" ]
+}
+
+@test "cdc . honors explicit push suppression and which mode" {
+    cdc -U .
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 0 ]
+
+    cdc -w . >"$BATS_TEST_TMPDIR/dot-which.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/dot-which.out" "$CDC_FIXTURE/start"
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 0 ]
+}
+
+@test "cdc . pushes nearest repository in repo-only mode" {
+    export CDC_REPOS_ONLY=true
+    cd "$CDC_FIXTURE/one/repo/bin"
+
+    cdc .
+
+    [ "$PWD" = "$CDC_FIXTURE/one/repo/bin" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+}
+
+@test "cdc . falls back to current directory in repo-only mode outside a repo" {
+    export CDC_REPOS_ONLY=true
+
+    cdc .
+
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/start" ]
+}
+
+@test "cdc -R . pushes the current directory even when repo-only mode is enabled" {
+    export CDC_REPOS_ONLY=true
+    cd "$CDC_FIXTURE/one/repo/bin"
+
+    cdc -R .
+
+    [ "$PWD" = "$CDC_FIXTURE/one/repo/bin" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo/bin" ]
+}
+
 @test "cdc -P changes to a configured parent directory" {
     cdc -P one
 
@@ -269,7 +330,7 @@ setup() {
 }
 
 @test "cdc does not leak internal variables" {
-    unset opt wdir cd_dir subdir use_color pushdir repos_only
+    unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only
     unset terminal_action_count has_directory_modifier CDC_RESET
     unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
 
@@ -282,6 +343,7 @@ setup() {
     [ -z "${subdir+x}" ]
     [ -z "${use_color+x}" ]
     [ -z "${pushdir+x}" ]
+    [ -z "${pushdir_option_set+x}" ]
     [ -z "${repos_only+x}" ]
     [ -z "${terminal_action_count+x}" ]
     [ -z "${has_directory_modifier+x}" ]
