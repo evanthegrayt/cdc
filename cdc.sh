@@ -25,6 +25,7 @@ cdc() {
     local print_help=false
     local terminal_action_count=0
     local has_directory_modifier=false
+    local pushdir_option_set=false
     local use_color=${CDC_COLOR:-true}
     local CDC_ERROR_COLOR="$CDC_ERROR_COLOR"
     local CDC_SUCCESS_COLOR="$CDC_SUCCESS_COLOR"
@@ -137,6 +138,7 @@ cdc() {
             # -u: Push the directory onto the history stack.
             u)
                 pushdir=true
+                pushdir_option_set=true
                 has_directory_modifier=true
                 ;;
 
@@ -144,6 +146,7 @@ cdc() {
             # -U: Do not push the directory onto the history stack.
             U)
                 pushdir=false
+                pushdir_option_set=true
                 has_directory_modifier=true
                 ;;
 
@@ -280,6 +283,22 @@ cdc() {
         _cdc_print 'error' 'USAGE: cdc [OPTION] [DIRECTORY]' $debug
         _cdc_print 'error' '  Use `-h` for more help' $debug
         return 1
+    fi
+
+    if [[ $1 == . ]]; then
+        if [[ $repos_only == true ]]; then
+            wdir=$(_cdc_find_nearest_repo_dir "$PWD")
+        else
+            wdir=$PWD
+        fi
+
+        if [[ $which == true ]]; then
+            printf "%s\n" "$wdir"
+        elif [[ $pushdir == true || $pushdir_option_set == false ]]; then
+            CDC_HISTORY+=("$wdir")
+        fi
+
+        return 0
     fi
 
     if [[ $cdc_parent_dirs == true ]]; then
@@ -612,6 +631,31 @@ _cdc_history_pop() {
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
     cd "${CDC_HISTORY[$cdc_last_index]}"
     return 0
+}
+
+##
+# Find the nearest repository ancestor for the current directory.
+#
+# @param string $dir
+# @return string
+_cdc_find_nearest_repo_dir() {
+    local dir="$1"
+
+    while [[ -n $dir ]]; do
+        if _cdc_is_repo_dir "$dir"; then
+            echo "$dir"
+            return 0
+        fi
+
+        if [[ $dir == / ]]; then
+            break
+        fi
+
+        dir=${dir%/*}
+        [[ -n $dir ]] || dir=/
+    done
+
+    echo "$PWD"
 }
 
 ##
