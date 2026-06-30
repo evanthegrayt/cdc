@@ -21,10 +21,17 @@ obviously use it for adding any directories to your `cd` path. In fact, this is
 the default behavior, but you *can* force `cdc` to only recognize repositories
 with a simple [configuration change](#only-recognize-actual-repositories).
 
+An added benefit is that certain variables are exported to your shell, which
+means you can utilize it in scripts and other plugins. For example, after every
+successful `cdc` call that changes directory, [a
+variable](#referencing-the-current-cdc-directory) is set to that path so you can
+reference it later, even from outside of the directory. I also wrote a custom
+[integration with vim](#vim) that makes use of the exported `CDC_DIRS` variable.
+
 ### Rationale
-I chose to make this function rather than editing `$CDPATH` because I don't like
+I chose to make this plugin rather than editing `$CDPATH` because I don't like
 changing the default behavior of `cd`, but you could just as easily do the
-following:
+following to match `cdc`'s most basic functionality.
 
 ```sh
 # Assuming `repository` exists in `/path/to/repo_dir`
@@ -43,9 +50,9 @@ I don't like this method either. In my opinion, the fewer aliases, the better.
 Also, you now have to remember an alias for each repository. `cdc` solves this
 issue with its tab-completion.
 
-An added benefit is that variables are exported to your shell, which means you
-can use it in scripts and other plugins. For example, I wrote a custom
-[integration with vim](#vim) that makes use of the exported `CDC_DIRS` variable.
+Even if you choose one of the above options, all it would do is help with the
+initial `cd`. As time has gone on, this plugin has gained a ton of
+[features](#options) that outclass anything the above methods can give you.
 
 ### Why the name "cdc"?
 I wanted something fast to type that wasn't already a command or builtin. You
@@ -178,20 +185,6 @@ without pushing. When `CDC_REPOS_ONLY` is `true`, `cdc .` pushes the nearest
 parent repository if one is found; otherwise, it pushes the current directory.
 Directories pushed this way are not added to tab-completion.
 
-### Referencing the current cdc directory
-After a successful `cdc` call that changes directories or records a directory,
-`cdc` exports `CDC_CURRENT` with the resolved cdc root. This gives you a stable
-path to use in later shell commands, even if you manually `cd` somewhere else.
-
-```sh
-cdc my-project/bin
-mv script.sh "$CDC_CURRENT"/scripts/
-```
-
-In the example above, `CDC_CURRENT` points to the root of `my-project`, not the
-`bin` subdirectory. Using `-w` only prints a directory path and does not update
-`CDC_CURRENT`.
-
 ### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
 adding the following lines to a shell config file.
@@ -223,6 +216,20 @@ cdc repo/bin
 
 If the subdirectory doesn't exist, it will `cd` to the base directory, and then
 print a message to `stderr`.
+
+### Referencing the current cdc directory
+After a successful `cdc` call that changes directories or records a directory,
+`cdc` exports `CDC_CURRENT` with the resolved cdc root. This gives you a stable
+path to use in later shell commands, even if you manually `cd` somewhere else.
+
+```sh
+cdc my-project/bin
+mv script.sh "$CDC_CURRENT"/scripts/
+```
+
+In the example above, `CDC_CURRENT` points to the root of `my-project`, not the
+`bin` subdirectory. Using `-w` only prints a directory path and does not update
+`CDC_CURRENT`.
 
 ### Options
 The plugin comes with a few available options. Some are for dealing with the
