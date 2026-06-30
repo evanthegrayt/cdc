@@ -15,6 +15,9 @@ _cdc_completion_options_by_kind() {
     local description
     local options=()
 
+    ##
+    # Option metadata lives in cdc.sh so help text and shell completion cannot
+    # drift apart.
     while IFS=$'\t' read -r opt kind description; do
         [[ $kind == "$requested_kind" ]] || continue
         options+=("-$opt")
@@ -99,9 +102,14 @@ _cdc_completion_has_terminal_action() {
     local opts
 
     for arg in "$@"; do
+        ##
+        # `--` ends option parsing. Anything after it is an operand, so there is
+        # no terminal action for completion to honor.
         [[ $arg == -- ]] && return 1
         [[ $arg == -* && $arg != "-" ]] || continue
 
+        ##
+        # Combined short options like -Rw are expanded one character at a time.
         opts="${arg#-}"
         while [[ -n $opts ]]; do
             opt="${opts%"${opts#?}"}"
@@ -123,6 +131,9 @@ _cdc_completion_has_operand() {
     local arg
 
     for arg in "$@"; do
+        ##
+        # Once options are terminated, completion should not treat later values
+        # as flags.
         [[ $arg == -- ]] && return 1
         [[ $arg == -* && $arg != "-" ]] && continue
         [[ -n $arg ]] && return 0
@@ -141,9 +152,13 @@ _cdc_completion_mode() {
     local opt
     local opts
     local allow_ignored=false
+    local allow_hidden=${CDC_ALLOW_HIDDEN:-false}
     local parent_dirs=false
     local repos_only=${CDC_REPOS_ONLY:-false}
 
+    ##
+    # Start from environment defaults, then apply already-typed directory
+    # modifiers in command-line order so flags override shell config.
     for arg in "$@"; do
         [[ $arg == -- ]] && break
         [[ $arg == -* && $arg != "-" ]] || continue
@@ -155,6 +170,7 @@ _cdc_completion_mode() {
 
             case "$opt" in
                 a) allow_ignored=true ;;
+                H) allow_hidden=true ;;
                 P) parent_dirs=true ;;
                 r) repos_only=true ;;
                 R) repos_only=false ;;
@@ -162,7 +178,7 @@ _cdc_completion_mode() {
         done
     done
 
-    echo "$allow_ignored $repos_only $parent_dirs"
+    echo "$allow_ignored $repos_only $parent_dirs $allow_hidden"
 }
 
 ##
@@ -170,10 +186,12 @@ _cdc_completion_mode() {
 #
 # @param boolean $allow_ignored
 # @param boolean $repos_only
+# @param boolean $allow_hidden
 # @return string
 _cdc_completion_repo_list() {
     local allow_ignored="$1"
     local repos_only="$2"
+    local allow_hidden="${3:-${CDC_ALLOW_HIDDEN:-false}}"
     local dir
     local fulldir
     local subdir
@@ -181,9 +199,10 @@ _cdc_completion_repo_list() {
     while IFS= read -r dir; do
         [[ -d $dir ]] || continue
 
-        for fulldir in "$dir"/*/; do
-            [[ -d $fulldir ]] || continue
-
+        ##
+        # Use the same child-directory helper as `cdc -l` so hidden directory
+        # behavior is identical between listing and completion.
+        while IFS= read -r fulldir; do
             subdir=${fulldir%/}
             subdir=${subdir##*/}
 
@@ -196,7 +215,7 @@ _cdc_completion_repo_list() {
             fi
 
             echo "$subdir"
-        done
+        done < <(_cdc_child_dirs "$dir" "$allow_hidden")
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
 }
 
@@ -213,6 +232,10 @@ _cdc_completion_parent_list() {
     while IFS= read -r dir; do
         [[ -d $dir ]] || continue
 
+        ##
+        # -P completes the configured parents themselves, not their children.
+        # Hidden configured parents are explicit CDC_DIRS entries and remain
+        # visible; CDC_IGNORE still applies by basename.
         parent_dir=${dir%/}
         parent_dir=${parent_dir##*/}
 
@@ -275,6 +298,9 @@ _cdc_completion_filter() {
     local candidate
 
     while IFS= read -r candidate; do
+        ##
+        # Shell completion matching is case-insensitive even before compadd gets
+        # the zsh matcher, so bash and zsh share the same candidate list.
         if _cdc_completion_matches_current "$current" "$candidate"; then
             echo "$candidate"
         fi
@@ -291,6 +317,9 @@ _cdc_completion_select_match() {
     local candidate
 
     while IFS= read -r candidate; do
+        ##
+        # When completing subdirectories, first recover the canonical casing of
+        # the selected cdc root.
         if _cdc_completion_matches_exact "$current" "$candidate"; then
             echo "$candidate"
             return 0
@@ -305,10 +334,12 @@ _cdc_completion_select_match() {
 #
 # @param string $base_dir
 # @param string $subdir_path
+# @param boolean $allow_hidden
 # @return string
 _cdc_completion_resolve_case_path() {
     local base_dir="$1"
     local subdir_path="$2"
+    local allow_hidden="${3:-${CDC_ALLOW_HIDDEN:-false}}"
     local resolved="$base_dir"
     local remaining="$subdir_path"
     local segment
@@ -316,6 +347,9 @@ _cdc_completion_resolve_case_path() {
     local fulldir_name
     local candidate
 
+    ##
+    # Resolve one path segment at a time so `repo/src` can be matched
+    # case-insensitively against the real on-disk names.
     while [[ -n $remaining ]]; do
         if [[ $remaining == */* ]]; then
             segment="${remaining%%/*}"
@@ -327,10 +361,11 @@ _cdc_completion_resolve_case_path() {
 
         [[ -n $segment ]] || continue
 
+        ##
+        # Search only directories that are allowed in the current completion
+        # mode, including hidden directories only for -H or CDC_ALLOW_HIDDEN.
         candidate=""
-        for fulldir in "$resolved"/*/; do
-            [[ -d $fulldir ]] || continue
-
+        while IFS= read -r fulldir; do
             fulldir_name=${fulldir%/}
             fulldir_name=${fulldir_name##*/}
 
@@ -338,7 +373,7 @@ _cdc_completion_resolve_case_path() {
                 candidate="${fulldir%/}"
                 break
             fi
-        done
+        done < <(_cdc_child_dirs "$resolved" "$allow_hidden")
 
         [[ -n $candidate ]] || return 2
         resolved="$candidate"
@@ -354,12 +389,14 @@ _cdc_completion_resolve_case_path() {
 # @param string $cd_dir
 # @param string $wdir
 # @param string $partial_subdir
+# @param boolean $allow_hidden
 # @return string
 _cdc_completion_subdir_list() {
     local current="$1"
     local cd_dir="$2"
     local wdir="$3"
     local partial_subdir="$4"
+    local allow_hidden="${5:-${CDC_ALLOW_HIDDEN:-false}}"
     local root_dir
     local parent
     local search_dir
@@ -369,12 +406,19 @@ _cdc_completion_subdir_list() {
     local candidate
 
     if [[ $partial_subdir == */* ]]; then
+        ##
+        # For nested completion, resolve the already-typed parent path to its
+        # on-disk casing before listing that directory's children.
         parent="${partial_subdir%/*}"
-        search_dir=$(_cdc_completion_resolve_case_path "$wdir" "$parent") || return 0
+        search_dir=$(_cdc_completion_resolve_case_path \
+            "$wdir" "$parent" "$allow_hidden") || return 0
         root_dir=${wdir%/}
         root_dir=${root_dir##*/}
         candidate_prefix="$root_dir/${search_dir#"$wdir"/}/"
     else
+        ##
+        # No nested parent was typed, so list direct children of the matched
+        # cdc root and prefix them with that root's basename.
         search_dir="$wdir"
         root_dir=${wdir%/}
         root_dir=${root_dir##*/}
@@ -383,9 +427,9 @@ _cdc_completion_subdir_list() {
 
     [[ -d $search_dir ]] || return 0
 
-    for fulldir in "$search_dir"/*/; do
-        [[ -d $fulldir ]] || continue
-
+    ##
+    # Emit candidates in cdc syntax (`root/subdir`), not absolute paths.
+    while IFS= read -r fulldir; do
         subdir=${fulldir%/}
         subdir=${subdir##*/}
         candidate="$candidate_prefix$subdir"
@@ -393,7 +437,7 @@ _cdc_completion_subdir_list() {
         if _cdc_completion_matches_current "$current" "$candidate"; then
             echo "$candidate"
         fi
-    done
+    done < <(_cdc_child_dirs "$search_dir" "$allow_hidden")
 }
 
 ##
@@ -403,42 +447,57 @@ _cdc_completion_subdir_list() {
 # @param boolean $allow_ignored
 # @param boolean $repos_only
 # @param boolean $parent_dirs
+# @param boolean $allow_hidden
 # @return string
 _cdc_completion_list() {
     local current="$1"
     local allow_ignored="${2:-false}"
     local repos_only="${3:-${CDC_REPOS_ONLY:-false}}"
     local parent_dirs="${4:-false}"
+    local allow_hidden="${5:-${CDC_ALLOW_HIDDEN:-false}}"
     local cd_dir
     local subdir
     local wdir
 
+    ##
+    # A slash means the user has selected a cdc root and is now completing
+    # subdirectories under that match.
     if [[ $current == */* ]]; then
         cd_dir="${current%%/*}"
         subdir="${current#*/}"
 
         if [[ $parent_dirs == true ]]; then
+            ##
+            # -P switches the root candidate set from child dirs to configured
+            # parent dirs.
             cd_dir=$(_cdc_completion_parent_list "$allow_ignored" \
                 | _cdc_completion_select_match "$cd_dir") || return 0
             wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" false)
         else
-            cd_dir=$(_cdc_completion_repo_list "$allow_ignored" "$repos_only" \
+            cd_dir=$(_cdc_completion_repo_list \
+                "$allow_ignored" "$repos_only" "$allow_hidden" \
                 | _cdc_completion_select_match "$cd_dir") || return 0
-            wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" false)
+            wdir=$(_cdc_find_dir \
+                "$cd_dir" "$allow_ignored" "$repos_only" false "$allow_hidden")
         fi
 
         (( $? == 0 )) || return 0
 
-        _cdc_completion_subdir_list "$current" "$cd_dir" "$wdir" "$subdir"
+        _cdc_completion_subdir_list \
+            "$current" "$cd_dir" "$wdir" "$subdir" "$allow_hidden"
         return 0
     fi
 
     if [[ $parent_dirs == true ]]; then
+        ##
+        # Without a slash, -P completes configured parent basenames.
         _cdc_completion_parent_list "$allow_ignored" \
             | _cdc_completion_filter "$current"
         return 0
     fi
 
-    _cdc_completion_repo_list "$allow_ignored" "$repos_only" \
+    ##
+    # Default completion lists child directories under CDC_DIRS.
+    _cdc_completion_repo_list "$allow_ignored" "$repos_only" "$allow_hidden" \
         | _cdc_completion_filter "$current"
 }

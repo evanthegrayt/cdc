@@ -22,6 +22,41 @@ setup() {
     [ "${#CDC_HISTORY[@]}" -eq 0 ]
 }
 
+@test "cdc resolves hidden directories only when allowed" {
+    run cdc -w .hidden
+    assert_failure_status 2
+    [ "$output" = "[.hidden] not found." ]
+
+    if cdc -D -w .hidden \
+        >"$BATS_TEST_TMPDIR/hidden-debug.out" \
+        2>"$BATS_TEST_TMPDIR/hidden-debug.err"; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 2 ]
+    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-debug.err")" == \
+        *"Match was found but hidden directories are not allowed."* ]]
+
+    cdc -H -w .hidden >"$BATS_TEST_TMPDIR/hidden-flag.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/hidden-flag.out" "$CDC_FIXTURE/one/.hidden"
+
+    export CDC_ALLOW_HIDDEN=true
+    cdc -w .hidden >"$BATS_TEST_TMPDIR/hidden-env.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/hidden-env.out" "$CDC_FIXTURE/one/.hidden"
+}
+
+@test "cdc lists hidden directories only when allowed" {
+    run cdc -l
+    assert_success
+    assert_output_not_contains ".hidden"
+
+    export CDC_ALLOW_HIDDEN=true
+    run cdc -l
+    assert_success
+    assert_output_contains ".hidden"
+}
+
 @test "cdc -U changes directories without pushing history" {
     cdc -U repo
 
@@ -173,6 +208,24 @@ setup() {
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
 }
 
+@test "cdc resolves hidden subdirectories only when allowed" {
+    cdc -w repo/.cache >"$BATS_TEST_TMPDIR/hidden-subdir.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/hidden-subdir.out" "$CDC_FIXTURE/one/repo"
+
+    cdc -D -w repo/.cache \
+        >"$BATS_TEST_TMPDIR/hidden-subdir-debug.out" \
+        2>"$BATS_TEST_TMPDIR/hidden-subdir-debug.err"
+    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-subdir-debug.out")" == \
+        *"$CDC_FIXTURE/one/repo"* ]]
+    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-subdir-debug.err")" == \
+        *"Match was found but hidden directories are not allowed."* ]]
+
+    cdc -H -w repo/.cache >"$BATS_TEST_TMPDIR/hidden-subdir-flag.out"
+    assert_file_equals \
+        "$BATS_TEST_TMPDIR/hidden-subdir-flag.out" \
+        "$CDC_FIXTURE/one/repo/.cache"
+}
+
 @test "cdc supports repo roots and repo names with spaces" {
     cdc -w "repo with space" >"$BATS_TEST_TMPDIR/space-repo.out"
     assert_file_equals "$BATS_TEST_TMPDIR/space-repo.out" "$CDC_FIXTURE/one/repo with space"
@@ -281,6 +334,8 @@ setup() {
     assert_output_contains "cd to a configured parent directory"
     assert_output_contains "-R"
     assert_output_contains "cd to any directory, even if it is not a repository"
+    assert_output_contains "-H"
+    assert_output_contains "Include hidden directories in lookup, listing, and completion"
 }
 
 @test "help does not require CDC_DIRS" {
@@ -331,6 +386,7 @@ setup() {
 
 @test "cdc does not leak internal variables" {
     unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only
+    unset allow_hidden
     unset terminal_action_count has_directory_modifier CDC_RESET
     unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
 
@@ -345,6 +401,7 @@ setup() {
     [ -z "${pushdir+x}" ]
     [ -z "${pushdir_option_set+x}" ]
     [ -z "${repos_only+x}" ]
+    [ -z "${allow_hidden+x}" ]
     [ -z "${terminal_action_count+x}" ]
     [ -z "${has_directory_modifier+x}" ]
     [ -z "${CDC_RESET+x}" ]
@@ -536,12 +593,12 @@ setup() {
     run bash -c '
         source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
 
-        unset cur mode allow_ignored repos_only parent_dirs candidates arg_count candidate args
+        unset cur mode allow_ignored allow_hidden repos_only parent_dirs candidates arg_count candidate args
         COMP_WORDS=(cdc repo/)
         COMP_CWORD=1
         _cdc_complete
 
-        for variable in cur mode allow_ignored repos_only parent_dirs candidates arg_count candidate args; do
+        for variable in cur mode allow_ignored allow_hidden repos_only parent_dirs candidates arg_count candidate args; do
             if declare -p "$variable" >/dev/null 2>&1; then
                 printf "%s leaked\n" "$variable"
                 exit 1
@@ -581,6 +638,60 @@ setup() {
 
     assert_success
     assert_output_not_contains "plain"
+}
+
+@test "bash completion lists hidden directories when allowed" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc .)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_not_contains ".hidden"
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc -H .)
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+
+        COMP_WORDS=(cdc -H repo/.)
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+
+        COMP_WORDS=(cdc -H repo/.cache/)
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains ".hidden"
+    assert_output_contains "repo/.cache"
+    assert_output_contains "repo/.cache/data"
+
+    export CDC_ALLOW_HIDDEN=true
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc .)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains ".hidden"
 }
 
 @test "bash completion lists configured parents with -P" {
@@ -726,12 +837,12 @@ setup() {
 
         source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
 
-        unset cur i allow_ignored repos_only parent_dirs args candidates mode descriptions
+        unset cur i allow_ignored allow_hidden repos_only parent_dirs args candidates mode descriptions
         words=(cdc repo/)
         CURRENT=2
         _cdc
 
-        for variable in cur i allow_ignored repos_only parent_dirs args candidates mode descriptions; do
+        for variable in cur i allow_ignored allow_hidden repos_only parent_dirs args candidates mode descriptions; do
             if typeset -p "$variable" >/dev/null 2>&1; then
                 print -r -- "$variable leaked"
                 exit 1
@@ -801,6 +912,103 @@ setup() {
 
     assert_success
     assert_output_not_contains "plain"
+}
+
+@test "zsh completion lists hidden directories when allowed" {
+    export CDC_PROJECT_ROOT
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
+                esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc .)
+        CURRENT=2
+        _cdc
+    '
+
+    assert_success
+    assert_output_not_contains ".hidden"
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
+                esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc -H .)
+        CURRENT=3
+        _cdc
+
+        words=(cdc -H repo/.)
+        CURRENT=3
+        _cdc
+
+        words=(cdc -H repo/.cache/)
+        CURRENT=3
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains ".hidden"
+    assert_output_contains "repo/.cache"
+    assert_output_contains "repo/.cache/data"
+
+    export CDC_ALLOW_HIDDEN=true
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
+                esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc .)
+        CURRENT=2
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains ".hidden"
 }
 
 @test "zsh completion lists configured parents with -P" {
@@ -905,6 +1113,7 @@ setup() {
     '
 
     assert_success
+    assert_output_contains "-H  Include hidden directories in lookup, listing, and completion"
     assert_output_contains "-P  cd to a configured parent directory"
     assert_output_contains "-R  cd to any directory, even if it is not a repository"
     assert_output_contains "-p  cd to the previous directory and pop it from the stack"

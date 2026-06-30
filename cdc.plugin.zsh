@@ -34,6 +34,7 @@ _cdc() {
   local cur
   local i
   local allow_ignored
+  local allow_hidden
   local repos_only
   local parent_dirs
   local -a args
@@ -51,25 +52,29 @@ _cdc() {
   done
 
   if _cdc_completion_has_terminal_action "${args[@]}"; then
+    # Terminal actions such as -l and -p complete the whole command.
     return
   fi
 
   if _cdc_completion_has_operand "${args[@]}"; then
+    # cdc accepts a single directory operand, so stop after one is present.
     return
   fi
 
   if [[ $cur == -* ]]; then
+    # Completing an option should show every supported flag with descriptions.
     _cdc_complete_options
     return
   fi
 
-  # _cdc_completion_mode prints three newline-separated booleans.
+  # _cdc_completion_mode prints four whitespace-separated booleans.
   mode=($(_cdc_completion_mode "${args[@]}"))
   allow_ignored="${mode[1]}"
   repos_only="${mode[2]}"
   parent_dirs="${mode[3]}"
+  allow_hidden="${mode[4]}"
   # Keep each newline-separated candidate as a single completion entry.
-  candidates=("${(@f)$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only" "$parent_dirs")}")
+  candidates=("${(@f)$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only" "$parent_dirs" "$allow_hidden")}")
 
   # -M makes matching case-insensitive; -S '' prevents an appended space.
   (( ${#candidates[@]} )) && compadd -M 'm:{a-zA-Z}={A-Za-z}' -S '' -- "${candidates[@]}"

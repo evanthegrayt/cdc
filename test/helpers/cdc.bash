@@ -11,6 +11,8 @@ setup_cdc_fixture() {
     mkdir -p "$CDC_HOME"
     mkdir -p "$CDC_FIXTURE/one/repo/.git"
     mkdir -p "$CDC_FIXTURE/one/repo/bin"
+    mkdir -p "$CDC_FIXTURE/one/repo/.cache/data"
+    mkdir -p "$CDC_FIXTURE/one/.hidden"
     mkdir -p "$CDC_FIXTURE/one/MixedCase/.git"
     mkdir -p "$CDC_FIXTURE/one/MixedCase/bin"
     mkdir -p "$CDC_FIXTURE/one/repo with space/.git"
@@ -30,6 +32,7 @@ setup_cdc_fixture() {
     unset CDC_REPO_MARKERS
     unset CDC_AUTO_PUSH
     unset CDC_COLOR
+    unset CDC_ALLOW_HIDDEN
 
     source "$CDC_PROJECT_ROOT/cdc.sh"
     cd "$CDC_FIXTURE/start"

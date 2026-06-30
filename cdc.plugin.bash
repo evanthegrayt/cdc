@@ -25,6 +25,7 @@ _cdc_complete() {
     local cur
     local mode
     local allow_ignored
+    local allow_hidden
     local repos_only
     local parent_dirs
     local candidates
@@ -42,11 +43,13 @@ _cdc_complete() {
     fi
 
     if _cdc_completion_has_terminal_action "${args[@]}"; then
+        # Terminal actions such as -l and -p complete the whole command.
         COMPREPLY=()
         return 0
     fi
 
     if _cdc_completion_has_operand "${args[@]}"; then
+        # cdc accepts a single directory operand, so stop after one is present.
         COMPREPLY=()
         return 0
     fi
@@ -57,12 +60,16 @@ _cdc_complete() {
         return 0
     fi
 
-    # _cdc_completion_mode prints three whitespace-separated booleans.
+    # _cdc_completion_mode prints four whitespace-separated booleans.
     mode=($(_cdc_completion_mode "${args[@]}"))
     allow_ignored="${mode[0]}"
     repos_only="${mode[1]}"
     parent_dirs="${mode[2]}"
-    candidates="$(_cdc_completion_list "$cur" "$allow_ignored" "$repos_only" "$parent_dirs")"
+    allow_hidden="${mode[3]}"
+    # Ask the shared helper for newline-separated candidates so names with
+    # spaces stay intact when copied into COMPREPLY below.
+    candidates="$(_cdc_completion_list \
+        "$cur" "$allow_ignored" "$repos_only" "$parent_dirs" "$allow_hidden")"
 
     # Bash reads completion candidates from COMPREPLY.
     COMPREPLY=()
