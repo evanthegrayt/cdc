@@ -9,6 +9,7 @@ cdc() {
     ##
     # Set local vars to avoid environment pollution.
     local wdir
+    local cdc_current_root
     local rc=0
     local cdc_list_dirs=false
     local cdc_list_searched_dirs=false
@@ -314,6 +315,7 @@ cdc() {
             printf "%s\n" "$wdir"
         elif [[ $pushdir == true || $pushdir_option_set == false ]]; then
             CDC_HISTORY+=("$wdir")
+            _cdc_set_current "$wdir"
         fi
 
         return 0
@@ -330,6 +332,8 @@ cdc() {
     fi
 
     if (( $? == 0 )); then
+        cdc_current_root="$wdir"
+
         ##
         # If pushdir is true and we're changing directories, add the directory
         # to the history stack.
@@ -349,7 +353,8 @@ cdc() {
         if [[ $which == true ]]; then
             printf "%s\n" "$wdir"
         else
-            cd "$wdir"
+            cd "$wdir" || return 1
+            _cdc_set_current "$cdc_current_root"
         fi
 
         ##
@@ -363,6 +368,15 @@ cdc() {
     _cdc_print 'error' "[$cd_dir] not found." $debug
 
     return 2
+}
+
+##
+# Store the last successful cdc target root for use in later shell commands.
+#
+# @param string $current_dir
+# @return void
+_cdc_set_current() {
+    export CDC_CURRENT="$1"
 }
 
 ##
@@ -612,7 +626,8 @@ _cdc_history_toggle() {
     ##
     # Finally, cd to the last directory in the stack.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    cd "${CDC_HISTORY[$cdc_last_index]}"
+    cd "${CDC_HISTORY[$cdc_last_index]}" || return 1
+    _cdc_set_current "${CDC_HISTORY[$cdc_last_index]}"
     return 0
 }
 
@@ -667,7 +682,8 @@ _cdc_history_current() {
     ##
     # cd to the root of the last repository in the history.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    cd "${CDC_HISTORY[$cdc_last_index]}"
+    cd "${CDC_HISTORY[$cdc_last_index]}" || return 1
+    _cdc_set_current "${CDC_HISTORY[$cdc_last_index]}"
     return 0
 }
 
@@ -701,7 +717,8 @@ _cdc_history_pop() {
     ##
     # cd to the previous directory in the stack.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
-    cd "${CDC_HISTORY[$cdc_last_index]}"
+    cd "${CDC_HISTORY[$cdc_last_index]}" || return 1
+    _cdc_set_current "${CDC_HISTORY[$cdc_last_index]}"
     return 0
 }
 

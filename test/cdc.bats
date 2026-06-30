@@ -14,12 +14,28 @@ setup() {
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
 }
 
+@test "cdc exports the current cdc root after changing directories" {
+    cdc repo
+
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
+    bash -c '[ "$CDC_CURRENT" = "$1" ]' bash "$CDC_FIXTURE/one/repo"
+}
+
 @test "cdc -w prints the match without changing directories" {
     cdc -w repo >"$BATS_TEST_TMPDIR/which.out"
 
     assert_file_equals "$BATS_TEST_TMPDIR/which.out" "$CDC_FIXTURE/one/repo"
     [ "$PWD" = "$CDC_FIXTURE/start" ]
     [ "${#CDC_HISTORY[@]}" -eq 0 ]
+    [ -z "${CDC_CURRENT+x}" ]
+}
+
+@test "cdc -w does not replace an existing current cdc root" {
+    cdc repo
+    cdc -w plain >"$BATS_TEST_TMPDIR/which.out"
+
+    assert_file_equals "$BATS_TEST_TMPDIR/which.out" "$CDC_FIXTURE/two/plain"
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
 @test "cdc resolves hidden directories only when allowed" {
@@ -62,6 +78,7 @@ setup() {
 
     [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
     [ "${#CDC_HISTORY[@]}" -eq 0 ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
 @test "cdc . pushes the current directory without changing directories" {
@@ -70,6 +87,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/start" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/start" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/start" ]
 }
 
 @test "cdc . pushes even when auto push is disabled" {
@@ -80,6 +98,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/start" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/start" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/start" ]
 }
 
 @test "cdc . honors explicit push suppression and which mode" {
@@ -91,6 +110,7 @@ setup() {
     assert_file_equals "$BATS_TEST_TMPDIR/dot-which.out" "$CDC_FIXTURE/start"
     [ "$PWD" = "$CDC_FIXTURE/start" ]
     [ "${#CDC_HISTORY[@]}" -eq 0 ]
+    [ -z "${CDC_CURRENT+x}" ]
 }
 
 @test "cdc . pushes nearest repository in repo-only mode" {
@@ -102,6 +122,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/one/repo/bin" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
 @test "cdc . falls back to current directory in repo-only mode outside a repo" {
@@ -112,6 +133,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/start" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/start" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/start" ]
 }
 
 @test "cdc -R . pushes the current directory even when repo-only mode is enabled" {
@@ -123,6 +145,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/one/repo/bin" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo/bin" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo/bin" ]
 }
 
 @test "cdc -P changes to a configured parent directory" {
@@ -131,6 +154,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/one" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one" ]
 }
 
 @test "cdc -P supports subdirectories under a configured parent directory" {
@@ -139,6 +163,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/two/plain" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/two" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/two" ]
 }
 
 @test "directory lookup options can be combined" {
@@ -206,6 +231,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/one/repo/bin" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
 @test "cdc resolves hidden subdirectories only when allowed" {
@@ -235,6 +261,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/one/repo with space/bin" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo with space" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo with space" ]
 }
 
 @test "cdc handles ignored names with spaces" {
@@ -256,6 +283,7 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
 @test "history toggle flips between the last two directories" {
@@ -264,9 +292,21 @@ setup() {
 
     cdc -t
     [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 
     cdc -t
     [ "$PWD" = "$CDC_FIXTURE/two/plain" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/two/plain" ]
+}
+
+@test "history current updates the current cdc root" {
+    cdc repo
+    cd "$CDC_FIXTURE/start"
+
+    cdc -n
+
+    [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
 @test "history list prints repository base names" {

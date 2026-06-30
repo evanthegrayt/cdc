@@ -178,6 +178,20 @@ without pushing. When `CDC_REPOS_ONLY` is `true`, `cdc .` pushes the nearest
 parent repository if one is found; otherwise, it pushes the current directory.
 Directories pushed this way are not added to tab-completion.
 
+### Referencing the current cdc directory
+After a successful `cdc` call that changes directories or records a directory,
+`cdc` exports `CDC_CURRENT` with the resolved cdc root. This gives you a stable
+path to use in later shell commands, even if you manually `cd` somewhere else.
+
+```sh
+cdc my-project/bin
+mv script.sh "$CDC_CURRENT"/scripts/
+```
+
+In the example above, `CDC_CURRENT` points to the root of `my-project`, not the
+`bin` subdirectory. Using `-w` only prints a directory path and does not update
+`CDC_CURRENT`.
+
 ### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
 adding the following lines to a shell config file.
