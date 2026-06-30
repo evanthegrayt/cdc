@@ -25,6 +25,7 @@ cdc() {
     local print_help=false
     local terminal_action_count=0
     local has_directory_modifier=false
+    local allow_hidden=${CDC_ALLOW_HIDDEN:-false}
     local pushdir_option_set=false
     local use_color=${CDC_COLOR:-true}
     local CDC_ERROR_COLOR="$CDC_ERROR_COLOR"
@@ -45,8 +46,9 @@ cdc() {
     local OPTIND
 
     ##
-    # Case options if present. Suppress errors because we'll supply our own.
-    while getopts 'acCdDhilLnPprRtuUw' opt 2>/dev/null; do
+    # Parse short options. getopts errors are suppressed so unsupported flags
+    # can use cdc's own error text instead of shell-generated messages.
+    while getopts 'acCdDhiHlLnPprRtuUw' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -63,6 +65,13 @@ cdc() {
             ##
             # -C: Disable color.
             C) use_color=false ;;
+
+            ##
+            # -H: Include hidden directories in lookup, listing, and completion.
+            H)
+                allow_hidden=true
+                has_directory_modifier=true
+                ;;
 
             ##
             # -n: cd to the root of the current repository in the stack.
@@ -178,15 +187,15 @@ cdc() {
     done
 
     ##
-    # Shift out $OPTIND so we can accurately determine how many parameters (not
-    # options) were passed. Then, set cd_dir to $1.
+    # Shift out parsed options so $# and $1 describe only the directory operand.
+    # cd_dir is the first path segment; subdir keeps the rest for later.
     shift $(( OPTIND - 1 ))
     local cd_dir="${1%%/*}"
     local subdir
 
     ##
-    # If argument contains a slash, it's assumed to contain subdirectories.
-    # This splits them into the directory root and its subdirectories.
+    # If the operand contains a slash, treat everything after the first slash as
+    # a subdirectory path under the matched cdc root.
     if [[ $1 == */* ]]; then
         subdir="${1#*/}"
     fi
@@ -207,6 +216,9 @@ cdc() {
         _cdc_print_debug_env
     fi
 
+    ##
+    # Standalone actions (-l, -d, -p, etc.) do not accept directory operands or
+    # directory modifiers because they complete the whole command by themselves.
     if (( terminal_action_count > 1 )); then
         _cdc_print 'error' 'Use only one standalone option at a time.' $debug
         return 1
@@ -236,13 +248,16 @@ cdc() {
         return 1
     fi
 
+    ##
+    # Execute the selected option-only action. rc preserves failure from helpers
+    # that report their own errors, such as empty history operations.
     if [[ $cdc_list_searched_dirs == true ]]; then
         _cdc_list_searched_dirs "$debug"
         should_return=true
     fi
 
     if [[ $cdc_list_dirs == true ]]; then
-        _cdc_list_available_dirs "$debug"
+        _cdc_list_available_dirs "$debug" "$allow_hidden"
         should_return=true
     fi
 
@@ -285,6 +300,9 @@ cdc() {
         return 1
     fi
 
+    ##
+    # `cdc .` is an explicit stack operation for the current directory. In
+    # repo-only mode it records the nearest repository root instead.
     if [[ $1 == . ]]; then
         if [[ $repos_only == true ]]; then
             wdir=$(_cdc_find_nearest_repo_dir "$PWD")
@@ -301,10 +319,14 @@ cdc() {
         return 0
     fi
 
+    ##
+    # Resolve either a configured parent directory (-P) or a child directory
+    # found beneath one of the configured parents.
     if [[ $cdc_parent_dirs == true ]]; then
         wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" "$debug")
     else
-        wdir=$(_cdc_find_dir "$cd_dir" "$allow_ignored" "$repos_only" "$debug")
+        wdir=$(_cdc_find_dir \
+            "$cd_dir" "$allow_ignored" "$repos_only" "$debug" "$allow_hidden")
     fi
 
     if (( $? == 0 )); then
@@ -315,7 +337,12 @@ cdc() {
             CDC_HISTORY+=("$wdir")
         fi
 
-        wdir=$(_cdc_resolve_subdir "$wdir" "$cd_dir" "$subdir" "$debug")
+        ##
+        # Append any requested subdirectory after the base match is known. This
+        # preserves the long-standing behavior where a missing subdirectory
+        # warns in debug mode but still resolves to the base directory.
+        wdir=$(_cdc_resolve_subdir \
+            "$wdir" "$cd_dir" "$subdir" "$debug" "$allow_hidden")
 
         ##
         # Finally, cd to the path, or display it if $which is true.
@@ -346,12 +373,52 @@ cdc() {
 _cdc_parse_colon_string() {
     local string="$1"
 
+    ##
+    # Repeatedly peel off the text before the next colon. This preserves spaces
+    # inside individual entries because read callers consume one printed line.
     while [[ $string == *:* ]]; do
         printf "%s\n" "${string%%:*}"
         string="${string#*:}"
     done
 
+    ##
+    # Print the final element after the last colon, if one exists.
     [[ -n $string ]] && printf "%s\n" "$string"
+}
+
+##
+# List child directories under a parent path.
+#
+# @param string $dir
+# @param boolean $allow_hidden
+# @return string
+_cdc_child_dirs() {
+    local dir="$1"
+    local allow_hidden="${2:-false}"
+    local fulldir
+
+    ##
+    # zsh raises an error for non-matching globs by default; bash leaves the
+    # pattern untouched. null_glob lets the loops below behave the same in zsh.
+    if [[ -n $ZSH_VERSION ]]; then
+        setopt local_options null_glob
+    fi
+
+    ##
+    # Normal globs intentionally do not include hidden entries.
+    for fulldir in "$dir"/*/; do
+        [[ -d $fulldir ]] || continue
+        printf "%s\n" "$fulldir"
+    done
+
+    ##
+    # Hidden globs are split into .[!.]* and ..?* so . and .. are never returned.
+    if [[ $allow_hidden == true ]]; then
+        for fulldir in "$dir"/.[!.]*/ "$dir"/..?*/; do
+            [[ -d $fulldir ]] || continue
+            printf "%s\n" "$fulldir"
+        done
+    fi
 }
 
 ##
@@ -376,6 +443,8 @@ _cdc_print_debug_env() {
         $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
     printf "CDC_REPOS_ONLY    = %s\n" \
         $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
+    printf "CDC_ALLOW_HIDDEN  = %s\n" \
+        $( _cdc_print 'boolean' $CDC_ALLOW_HIDDEN )
     printf "CDC_COLOR         = %s\n" \
         $( _cdc_print 'boolean' $CDC_COLOR )
     echo
@@ -399,6 +468,7 @@ _cdc_option_specs() {
     printf "%s\t%s\t%s\n" 'a' 'directory' 'cd to the directory even if it is ignored'
     printf "%s\t%s\t%s\n" 'c' 'directory' 'Enable colored output'
     printf "%s\t%s\t%s\n" 'C' 'directory' 'Disable colored output'
+    printf "%s\t%s\t%s\n" 'H' 'directory' 'Include hidden directories in lookup, listing, and completion'
     printf "%s\t%s\t%s\n" 'l' 'terminal' 'List cdc-able directories'
     printf "%s\t%s\t%s\n" 'L' 'terminal' 'List directories that cdc searches'
     printf "%s\t%s\t%s\n" 'i' 'terminal' 'List ignored directories'
@@ -455,9 +525,11 @@ _cdc_list_searched_dirs() {
 # List the directories cdc can change to.
 #
 # @param boolean $debug
+# @param boolean $allow_hidden
 # @return void
 _cdc_list_available_dirs() {
     local debug="$1"
+    local allow_hidden="${2:-${CDC_ALLOW_HIDDEN:-false}}"
     local list
 
     if [[ $debug == true ]]; then
@@ -468,7 +540,7 @@ _cdc_list_available_dirs() {
     # Print the list and pipe to column for nice output. Also pad each element
     # to make them all at least 8 characters long. This is done because column
     # has issues printing strings less than 8 bytes.
-    _cdc_repo_list "$debug" | while IFS= read -r list; do
+    _cdc_repo_list "$debug" "$allow_hidden" | while IFS= read -r list; do
         printf "%-8s\n" "$list"
     done | column
 }
@@ -641,6 +713,9 @@ _cdc_history_pop() {
 _cdc_find_nearest_repo_dir() {
     local dir="$1"
 
+    ##
+    # Walk upward from the current directory until a repository marker is found
+    # or the filesystem root is reached.
     while [[ -n $dir ]]; do
         if _cdc_is_repo_dir "$dir"; then
             echo "$dir"
@@ -666,6 +741,8 @@ _cdc_find_nearest_repo_dir() {
 _cdc_array_last_index() {
     local array_size="$1"
 
+    ##
+    # zsh arrays are 1-indexed; bash arrays are 0-indexed.
     if [[ -n $ZSH_VERSION ]]; then
         echo "$array_size"
     else
@@ -681,6 +758,8 @@ _cdc_array_last_index() {
 _cdc_array_next_to_last_index() {
     local array_size="$1"
 
+    ##
+    # zsh arrays are 1-indexed; bash arrays are 0-indexed.
     if [[ -n $ZSH_VERSION ]]; then
         echo $(( array_size - 1 ))
     else
@@ -695,12 +774,14 @@ _cdc_array_next_to_last_index() {
 # @param boolean $allow_ignored
 # @param boolean $repos_only
 # @param boolean $debug
+# @param boolean $allow_hidden
 # @return string
 _cdc_find_dir() {
     local cd_dir="$1"
     local allow_ignored="$2"
     local repos_only="$3"
     local debug="$4"
+    local allow_hidden="${5:-${CDC_ALLOW_HIDDEN:-false}}"
     local dir
 
     ##
@@ -732,6 +813,16 @@ _cdc_find_dir() {
             continue
 
         ##
+        # If the directory exists, but is hidden, skip it unless allowed.
+        elif [[ $allow_hidden == false ]] && _cdc_is_hidden_dir "$cd_dir"; then
+            if [[ $debug == true ]]; then
+                _cdc_print 'warn' \
+                    'Match was found but hidden directories are not allowed.' \
+                    $debug
+            fi
+            continue
+
+        ##
         # If the directory exists, but we're in repos-only mode and the
         # directory isn't a repo, skip it.
         elif [[ $repos_only == true ]] && ! _cdc_is_repo_dir "$dir/$cd_dir"; then
@@ -743,8 +834,8 @@ _cdc_find_dir() {
         fi
 
         ##
-        # By this point, the parameter obviously exists as a valid directory,
-        # so we print it for the caller.
+        # By this point, the match exists and passed ignore/hidden/repo checks,
+        # so print the absolute path for the caller.
         echo "$dir/$cd_dir"
         return 0
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
@@ -780,6 +871,9 @@ _cdc_find_parent_dir() {
         parent_dir=${dir%/}
         parent_dir=${parent_dir##*/}
 
+        ##
+        # -P searches configured CDC_DIRS entries by basename. Hidden configured
+        # parents are explicit entries and are not gated by CDC_ALLOW_HIDDEN.
         if [[ $parent_dir != "$cd_dir" ]]; then
             continue
         elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$parent_dir"; then
@@ -803,20 +897,34 @@ _cdc_find_parent_dir() {
 # @param string $cd_dir
 # @param string $subdir
 # @param boolean $debug
+# @param boolean $allow_hidden
 # @return string
 _cdc_resolve_subdir() {
     local wdir="$1"
     local cd_dir="$2"
     local subdir="$3"
     local debug="$4"
+    local allow_hidden="${5:-${CDC_ALLOW_HIDDEN:-false}}"
 
     ##
-    # If the user passed a subdirectory (if the argument had a slash in it).
+    # If the user passed a subdirectory path, decide whether it can be appended
+    # to the already-resolved cdc root.
     if [[ -n $subdir ]]; then
 
         ##
-        # If it exists as a directory, append it to the path.
-        if [[ -d $wdir/$subdir ]]; then
+        # A hidden subdirectory is treated like a missing subdirectory unless
+        # hidden directories are explicitly allowed.
+        if [[ -d $wdir/$subdir ]] \
+            && [[ $allow_hidden == false ]] \
+            && _cdc_path_contains_hidden_dir "$subdir"; then
+            if [[ $debug == true ]]; then
+                _cdc_print 'warn' \
+                    'Match was found but hidden directories are not allowed.' \
+                    $debug
+            fi
+        ##
+        # If it exists as an allowed directory, append it to the path.
+        elif [[ -d $wdir/$subdir ]]; then
             wdir+="/$subdir"
         else
 
@@ -864,9 +972,48 @@ _cdc_is_excluded_dir() {
 }
 
 ##
+# Is the argument a hidden directory name?
+#
+# @param string $string
+# @return boolean
+_cdc_is_hidden_dir() {
+    local string="$1"
+
+    ##
+    # A leading dot marks hidden names, but . and .. are shell path syntax, not
+    # hidden directories that cdc should gate.
+    [[ $string == .* && $string != . && $string != .. ]]
+}
+
+##
+# Does a relative path contain a hidden directory segment?
+#
+# @param string $path
+# @return boolean
+_cdc_path_contains_hidden_dir() {
+    local path="$1"
+    local segment
+
+    ##
+    # Walk each path segment so nested values like foo/.cache/bar are blocked
+    # even when the cdc root itself is visible.
+    while [[ $path == */* ]]; do
+        segment="${path%%/*}"
+        path="${path#*/}"
+
+        if _cdc_is_hidden_dir "$segment"; then
+            return 0
+        fi
+    done
+
+    _cdc_is_hidden_dir "$path"
+}
+
+##
 # Lists directories found in CDC_DIRS that aren't excluded.
 #
 # @param boolean $debug
+# @param boolean $allow_hidden
 # @return string
 _cdc_repo_list() {
     local dir
@@ -874,6 +1021,7 @@ _cdc_repo_list() {
     local fulldir
     local directories=()
     local debug=${1:-false}
+    local allow_hidden="${2:-${CDC_ALLOW_HIDDEN:-false}}"
 
     ##
     # Loop through every path in the colon-delimited CDC_DIRS value.
@@ -891,9 +1039,7 @@ _cdc_repo_list() {
 
         ##
         # Loop through all subdirectories in the directory.
-        for fulldir in "$dir"/*/; do
-            [[ -d $fulldir ]] || continue
-
+        while IFS= read -r fulldir; do
             ##
             # Remove trailing slash from directory.
             subdir=${fulldir%/}
@@ -913,7 +1059,7 @@ _cdc_repo_list() {
             if ! _cdc_is_excluded_dir "$subdir"; then
                 directories+=("$subdir")
             fi
-        done
+        done < <(_cdc_child_dirs "$dir" "$allow_hidden")
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
 
     ##

@@ -124,6 +124,18 @@ elements should only be the directory base-name, **not** the absolute path.
 export CDC_IGNORE=notes_directory:training
 ```
 
+### Including hidden directories in listings and completion
+If a directory inside `CDC_DIRS` starts with `.`, it is hidden from lookup,
+`cdc -l`, and tab-completion by default. To include hidden directories, set
+`CDC_ALLOW_HIDDEN` to `true`.
+
+```sh
+export CDC_ALLOW_HIDDEN=true
+```
+
+You can also enable hidden directories for one command with `-H`, such as
+`cdc -H .config` or `cdc -H .<TAB>`.
+
 ### Only recognize actual repositories
 You can `export CDC_REPOS_ONLY` in a shell config file to make `cdc` only recognize
 repositories as directories. This is **disabled by default**. You can also set
@@ -211,6 +223,7 @@ Options that change a directory lookup can be combined, such as `-aRw` or
 |-a|Allow the plugin to `cd` to ignored directories.|
 |-c|Enable colored output.|
 |-C|Disable colored output.|
+|-H|Include hidden directories in lookup, listing, and completion.|
 |-l|List all directories to which you can `cdc`. Same as tab-completion.|
 |-L|List the directories in which `cdc` will search.|
 |-i|List the directories that are to be ignored.|
