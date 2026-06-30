@@ -33,6 +33,7 @@ setup_cdc_fixture() {
     unset CDC_AUTO_PUSH
     unset CDC_COLOR
     unset CDC_ALLOW_HIDDEN
+    unset CDC_CURRENT
 
     source "$CDC_PROJECT_ROOT/cdc.sh"
     cd "$CDC_FIXTURE/start"
