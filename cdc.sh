@@ -314,7 +314,7 @@ cdc() {
         if [[ $which == true ]]; then
             printf "%s\n" "$wdir"
         elif [[ $pushdir == true || $pushdir_option_set == false ]]; then
-            CDC_HISTORY+=("$wdir")
+            _cdc_history_push "$wdir"
             _cdc_set_current "$wdir"
         fi
 
@@ -338,7 +338,7 @@ cdc() {
         # If pushdir is true and we're changing directories, add the directory
         # to the history stack.
         if [[ $pushdir == true && $which != true ]]; then
-            CDC_HISTORY+=("$wdir")
+            _cdc_history_push "$wdir"
         fi
 
         ##
@@ -377,6 +377,32 @@ cdc() {
 # @return void
 _cdc_set_current() {
     export CDC_CURRENT="$1"
+}
+
+##
+# Push a directory onto the history stack.
+#
+# When CDC_IGNORE_DUPS is true, remove any existing matching entry first so the
+# current directory remains at the end of the stack without duplicates.
+#
+# @param string $dir
+# @return void
+_cdc_history_push() {
+    local dir="$1"
+    local cdc_history
+    local -a cdc_new_history=()
+
+    if [[ ${CDC_IGNORE_DUPS:-false} != true ]]; then
+        CDC_HISTORY+=("$dir")
+        return
+    fi
+
+    for cdc_history in "${CDC_HISTORY[@]}"; do
+        [[ $cdc_history == "$dir" ]] && continue
+        cdc_new_history+=("$cdc_history")
+    done
+
+    CDC_HISTORY=("${cdc_new_history[@]}" "$dir")
 }
 
 ##
@@ -455,6 +481,8 @@ _cdc_print_debug_env() {
     echo
     printf "CDC_AUTO_PUSH     = %s\n" \
         $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
+    printf "CDC_IGNORE_DUPS   = %s\n" \
+        $( _cdc_print 'boolean' $CDC_IGNORE_DUPS )
     printf "CDC_REPOS_ONLY    = %s\n" \
         $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
     printf "CDC_ALLOW_HIDDEN  = %s\n" \
