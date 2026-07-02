@@ -177,6 +177,16 @@ it to the stack with the `-U` option. See [options](#options) below.
 Using `-w` only prints a directory path and does not push anything onto the
 history stack.
 
+By default, the history stack can contain duplicate directories. To follow the
+`pushd` behavior from shells that enable duplicate suppression, set
+`CDC_IGNORE_DUPS` to `true`. When enabled, pushing a directory that is already in
+the stack moves it to the current position instead of adding a duplicate.
+
+```sh
+# Move repeated directories to the current position instead of duplicating them.
+export CDC_IGNORE_DUPS=true
+```
+
 You can also push the current directory onto the stack with `cdc .`. This does
 not change directories. It still pushes when `CDC_AUTO_PUSH` is `false`, because
 `.` is an explicit request to push the current directory. Use `cdc -U .` to skip

@@ -31,6 +31,7 @@ setup_cdc_fixture() {
     export CDC_REPOS_ONLY=false
     unset CDC_REPO_MARKERS
     unset CDC_AUTO_PUSH
+    unset CDC_IGNORE_DUPS
     unset CDC_COLOR
     unset CDC_ALLOW_HIDDEN
     unset CDC_CURRENT

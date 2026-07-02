@@ -14,6 +14,37 @@ setup() {
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
 }
 
+@test "cdc allows duplicate history entries by default" {
+    cdc repo
+    cdc plain
+    cdc repo
+
+    [ "${#CDC_HISTORY[@]}" -eq 3 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/two/plain" ]
+    [ "${CDC_HISTORY[2]}" = "$CDC_FIXTURE/one/repo" ]
+}
+
+@test "CDC_IGNORE_DUPS moves repeated history entries to the current position" {
+    export CDC_IGNORE_DUPS=true
+
+    cdc repo
+    cdc plain
+    cdc repo
+
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/two/plain" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/one/repo" ]
+
+    run cdc -d
+    assert_success
+    [ "$output" = "plain repo " ]
+
+    cdc -p
+    [ "$PWD" = "$CDC_FIXTURE/two/plain" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/two/plain" ]
+}
+
 @test "cdc exports the current cdc root after changing directories" {
     cdc repo
 
@@ -98,6 +129,21 @@ setup() {
     [ "$PWD" = "$CDC_FIXTURE/start" ]
     [ "${#CDC_HISTORY[@]}" -eq 1 ]
     [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/start" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/start" ]
+}
+
+@test "cdc . honors CDC_IGNORE_DUPS" {
+    export CDC_IGNORE_DUPS=true
+
+    cdc .
+    cdc repo
+    cd "$CDC_FIXTURE/start"
+    cdc .
+
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/start" ]
     [ "$CDC_CURRENT" = "$CDC_FIXTURE/start" ]
 }
 
@@ -1180,6 +1226,33 @@ setup() {
         cdc -p || exit 5
         [[ "$PWD" == "$CDC_FIXTURE/one/repo" ]] || exit 6
         [[ ${#CDC_HISTORY[@]} -eq 1 ]] || exit 7
+    '
+
+    assert_success
+}
+
+@test "zsh honors CDC_IGNORE_DUPS" {
+    export CDC_PROJECT_ROOT
+    export CDC_FIXTURE
+
+    run zsh -c '
+        source "$CDC_PROJECT_ROOT/cdc.sh"
+        cd "$CDC_FIXTURE/start"
+        export CDC_DIRS="$CDC_FIXTURE/one:$CDC_FIXTURE/two:$CDC_FIXTURE/three"
+        export CDC_IGNORE=ignored
+        export CDC_REPOS_ONLY=false
+        export CDC_IGNORE_DUPS=true
+
+        cdc repo || exit 1
+        cdc plain || exit 2
+        cdc repo || exit 3
+
+        [[ ${#CDC_HISTORY[@]} -eq 2 ]] || exit 4
+        [[ ${CDC_HISTORY[1]} == "$CDC_FIXTURE/two/plain" ]] || exit 5
+        [[ ${CDC_HISTORY[2]} == "$CDC_FIXTURE/one/repo" ]] || exit 6
+
+        cdc -n || exit 7
+        [[ "$PWD" == "$CDC_FIXTURE/one/repo" ]] || exit 8
     '
 
     assert_success
