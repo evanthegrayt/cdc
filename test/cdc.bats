@@ -74,15 +74,15 @@ setup() {
     assert_failure_status 2
     [ "$output" = "[.hidden] not found." ]
 
-    if cdc -D -w .hidden \
-        >"$BATS_TEST_TMPDIR/hidden-debug.out" \
-        2>"$BATS_TEST_TMPDIR/hidden-debug.err"; then
+    if cdc -v -w .hidden \
+        >"$BATS_TEST_TMPDIR/hidden-verbose.out" \
+        2>"$BATS_TEST_TMPDIR/hidden-verbose.err"; then
         status=0
     else
         status=$?
     fi
     [ "$status" -eq 2 ]
-    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-debug.err")" == \
+    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-verbose.err")" == \
         *"Match was found but hidden directories are not allowed."* ]]
 
     cdc -H -w .hidden >"$BATS_TEST_TMPDIR/hidden-flag.out"
@@ -284,12 +284,12 @@ setup() {
     cdc -w repo/.cache >"$BATS_TEST_TMPDIR/hidden-subdir.out"
     assert_file_equals "$BATS_TEST_TMPDIR/hidden-subdir.out" "$CDC_FIXTURE/one/repo"
 
-    cdc -D -w repo/.cache \
-        >"$BATS_TEST_TMPDIR/hidden-subdir-debug.out" \
-        2>"$BATS_TEST_TMPDIR/hidden-subdir-debug.err"
-    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-subdir-debug.out")" == \
+    cdc -v -w repo/.cache \
+        >"$BATS_TEST_TMPDIR/hidden-subdir-verbose.out" \
+        2>"$BATS_TEST_TMPDIR/hidden-subdir-verbose.err"
+    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-subdir-verbose.out")" == \
         *"$CDC_FIXTURE/one/repo"* ]]
-    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-subdir-debug.err")" == \
+    [[ "$(cat "$BATS_TEST_TMPDIR/hidden-subdir-verbose.err")" == \
         *"Match was found but hidden directories are not allowed."* ]]
 
     cdc -H -w repo/.cache >"$BATS_TEST_TMPDIR/hidden-subdir-flag.out"
@@ -363,6 +363,30 @@ setup() {
 
     assert_success
     [ "$output" = "repo repo with space " ]
+}
+
+@test "history list prints full paths in verbose mode" {
+    cdc repo
+    cdc "repo with space"
+
+    run cdc -v -d
+
+    assert_success
+    assert_output_contains "Listing directories in history."
+    assert_output_contains "$CDC_FIXTURE/one/repo "
+    assert_output_contains "$CDC_FIXTURE/one/repo with space "
+}
+
+@test "legacy -D enables verbose mode" {
+    cdc repo
+    cdc "repo with space"
+
+    run cdc -D -d
+
+    assert_success
+    assert_output_contains "Listing directories in history."
+    assert_output_contains "$CDC_FIXTURE/one/repo "
+    assert_output_contains "$CDC_FIXTURE/one/repo with space "
 }
 
 @test "history delete removes all basename matches and preserves remaining order" {
@@ -539,6 +563,9 @@ setup() {
     assert_output_contains "Delete matching directories from the stack"
     assert_output_contains "-X"
     assert_output_contains "Clear the history stack"
+    assert_output_contains "-v"
+    assert_output_contains "Enable verbose output"
+    assert_output_not_contains "-D"
 }
 
 @test "help does not require CDC_DIRS" {
@@ -588,7 +615,7 @@ setup() {
 }
 
 @test "cdc does not leak internal variables" {
-    unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only
+    unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only verbose
     unset allow_hidden cdc_delete_history cdc_clear_history
     unset terminal_action_count has_directory_modifier CDC_RESET
     unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
@@ -604,6 +631,7 @@ setup() {
     [ -z "${pushdir+x}" ]
     [ -z "${pushdir_option_set+x}" ]
     [ -z "${repos_only+x}" ]
+    [ -z "${verbose+x}" ]
     [ -z "${allow_hidden+x}" ]
     [ -z "${cdc_delete_history+x}" ]
     [ -z "${cdc_clear_history+x}" ]
@@ -918,6 +946,23 @@ setup() {
     assert_output_not_contains "repo"
     assert_output_not_contains "plain"
     assert_output_not_contains "custom"
+}
+
+@test "bash option completion includes verbose flag and hides legacy D flag" {
+    export CDC_PROJECT_ROOT
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc -)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains "-v"
+    assert_output_not_contains "-D"
 }
 
 @test "bash completion suppresses directory operands after action flags" {
@@ -1392,6 +1437,8 @@ setup() {
     assert_output_contains "-p  cd to the previous directory and pop it from the stack"
     assert_output_contains "-x  Delete matching directories from the stack"
     assert_output_contains "-X  Clear the history stack"
+    assert_output_contains "-v  Enable verbose output"
+    assert_output_not_contains "-D"
     assert_output_not_contains "even it is not"
 }
 
