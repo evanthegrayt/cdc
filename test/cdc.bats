@@ -365,6 +365,119 @@ setup() {
     [ "$output" = "repo repo with space " ]
 }
 
+@test "history delete removes all basename matches and preserves remaining order" {
+    cdc repo
+    cdc plain
+    cdc repo
+
+    cdc -x repo
+
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/two/plain" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
+
+    run cdc -d
+    assert_success
+    [ "$output" = "plain " ]
+}
+
+@test "history delete removes exact full path matches" {
+    CDC_HISTORY=(
+        "$CDC_FIXTURE/one/repo"
+        "$CDC_FIXTURE/two/repo"
+        "$CDC_FIXTURE/two/plain"
+    )
+
+    cdc -x "$CDC_FIXTURE/two/repo"
+
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/two/plain" ]
+}
+
+@test "history delete failures leave history unchanged" {
+    cdc repo
+    cdc plain
+
+    run cdc -x
+    assert_failure_status 1
+    assert_output_contains "History delete requires a directory."
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+
+    run cdc -x missing
+    assert_failure_status 1
+    assert_output_contains "[missing] not found in history."
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/two/plain" ]
+}
+
+@test "history delete reports empty history" {
+    run cdc -x repo
+
+    assert_failure_status 1
+    [ "$output" = "Stack is empty." ]
+}
+
+@test "history clear resets stack and leaves current unchanged" {
+    cdc repo
+    cdc plain
+
+    cdc -X
+
+    [ "${#CDC_HISTORY[@]}" -eq 0 ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/two/plain" ]
+}
+
+@test "history clear rejects operands and leaves history unchanged" {
+    cdc repo
+
+    run cdc -X repo
+
+    assert_failure_status 1
+    assert_output_contains "Standalone options do not accept a directory."
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+}
+
+@test "history operations reject combined action and directory flags" {
+    run cdc -xw repo
+    assert_failure_status 1
+    assert_output_contains "Standalone options cannot be combined with directory options."
+
+    run cdc -xl repo
+    assert_failure_status 1
+    assert_output_contains "Use only one standalone option at a time."
+
+    run cdc -xX repo
+    assert_failure_status 1
+    assert_output_contains "Use only one standalone option at a time."
+
+    run cdc -ax repo
+    assert_failure_status 1
+    assert_output_contains "Standalone options cannot be combined with directory options."
+}
+
+@test "history navigation still works after deleting entries" {
+    cdc repo
+    cdc plain
+    cdc custom
+
+    cdc -x plain
+    cdc -t
+
+    [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
+
+    cdc -n
+    [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
+
+    cdc -p
+    [ "$PWD" = "$CDC_FIXTURE/three/custom" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/three/custom" ]
+}
+
 @test "list options print configured directories" {
     run cdc -L
     assert_success
@@ -422,6 +535,10 @@ setup() {
     assert_output_contains "cd to any directory, even if it is not a repository"
     assert_output_contains "-H"
     assert_output_contains "Include hidden directories in lookup, listing, and completion"
+    assert_output_contains "-x"
+    assert_output_contains "Delete matching directories from the stack"
+    assert_output_contains "-X"
+    assert_output_contains "Clear the history stack"
 }
 
 @test "help does not require CDC_DIRS" {
@@ -472,7 +589,7 @@ setup() {
 
 @test "cdc does not leak internal variables" {
     unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only
-    unset allow_hidden
+    unset allow_hidden cdc_delete_history cdc_clear_history
     unset terminal_action_count has_directory_modifier CDC_RESET
     unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
 
@@ -488,6 +605,8 @@ setup() {
     [ -z "${pushdir_option_set+x}" ]
     [ -z "${repos_only+x}" ]
     [ -z "${allow_hidden+x}" ]
+    [ -z "${cdc_delete_history+x}" ]
+    [ -z "${cdc_clear_history+x}" ]
     [ -z "${terminal_action_count+x}" ]
     [ -z "${has_directory_modifier+x}" ]
     [ -z "${CDC_RESET+x}" ]
@@ -815,6 +934,33 @@ setup() {
 
     assert_success
     [ "$output" = "" ]
+}
+
+@test "bash completion completes history delete basenames" {
+    export CDC_PROJECT_ROOT
+    export CDC_FIXTURE
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+        CDC_HISTORY=(
+            "$CDC_FIXTURE/one/repo"
+            "$CDC_FIXTURE/two/plain"
+            "$CDC_FIXTURE/two/repo"
+        )
+
+        COMP_WORDS=(cdc -x "")
+        COMP_CWORD=2
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+
+        COMP_WORDS=(cdc -x repo "")
+        COMP_CWORD=3
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    [ "$output" = $'repo\nplain' ]
 }
 
 @test "zsh completion completes cdc subdirectories" {
@@ -1164,6 +1310,47 @@ setup() {
     [ "$output" = "" ]
 }
 
+@test "zsh completion completes history delete basenames" {
+    export CDC_PROJECT_ROOT
+    export CDC_FIXTURE
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
+                esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+        CDC_HISTORY=(
+            "$CDC_FIXTURE/one/repo"
+            "$CDC_FIXTURE/two/plain"
+            "$CDC_FIXTURE/two/repo"
+        )
+
+        words=(cdc -x "")
+        CURRENT=3
+        _cdc
+
+        words=(cdc -x repo "")
+        CURRENT=4
+        _cdc
+    '
+
+    assert_success
+    [ "$output" = $'repo\nplain' ]
+}
+
 @test "zsh option completion display includes flags and corrected descriptions" {
     export CDC_PROJECT_ROOT
 
@@ -1203,6 +1390,8 @@ setup() {
     assert_output_contains "-P  cd to a configured parent directory"
     assert_output_contains "-R  cd to any directory, even if it is not a repository"
     assert_output_contains "-p  cd to the previous directory and pop it from the stack"
+    assert_output_contains "-x  Delete matching directories from the stack"
+    assert_output_contains "-X  Clear the history stack"
     assert_output_not_contains "even it is not"
 }
 

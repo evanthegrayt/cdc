@@ -56,6 +56,16 @@ _cdc() {
     return
   fi
 
+  if _cdc_completion_has_history_action "${args[@]}"; then
+    if _cdc_completion_has_operand "${args[@]}"; then
+      return
+    fi
+
+    candidates=("${(@f)$(_cdc_completion_history_list "$cur")}")
+    (( ${#candidates[@]} )) && compadd -M 'm:{a-zA-Z}={A-Za-z}' -S '' -- "${candidates[@]}"
+    return
+  fi
+
   if _cdc_completion_has_operand "${args[@]}"; then
     # cdc accepts a single directory operand, so stop after one is present.
     return
