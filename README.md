@@ -244,7 +244,7 @@ In the example above, `CDC_CURRENT` points to the root of `my-project`, not the
 ### Options
 The plugin comes with a few available options. Some are for dealing with the
 directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
-overriding variables set in a shell config file. There's also a debug mode.
+overriding variables set in a shell config file. There's also a verbose mode.
 Options that change a directory lookup can be combined, such as `-aRw` or
 `-PU`. Standalone action options (`-l`, `-L`, `-i`, `-d`, `-n`, `-t`, `-p`,
 `-X`, and `-h`) should be used one at a time, without a directory argument.
@@ -271,7 +271,7 @@ to delete matching entries from the history stack.
 |-X|Clear the history stack.|
 |-r|Only `cd` to repositories.|
 |-R|`cd` to the directory even if it's not a repository.|
-|-D|Debug mode. Enables warnings for when things aren't working as expected.|
+|-v|Verbose mode. Enables warnings for when things aren't working as expected.|
 |-w|Print the directory location instead of changing to it. Like `which`.|
 |-h|Print help.|
 

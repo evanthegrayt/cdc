@@ -14,7 +14,7 @@ cdc() {
     local cdc_list_dirs=false
     local cdc_list_searched_dirs=false
     local cdc_toggle=false
-    local debug=false
+    local verbose=false
     local should_return=false
     local allow_ignored=false
     local which=false
@@ -51,7 +51,7 @@ cdc() {
     ##
     # Parse short options. getopts errors are suppressed so unsupported flags
     # can use cdc's own error text instead of shell-generated messages.
-    while getopts 'acCdDhiHlLnPprRtuUwxX' opt 2>/dev/null; do
+    while getopts 'acCdDhiHlLnPprRtuUvwxX' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -177,8 +177,9 @@ cdc() {
                 ;;
 
             ##
-            # -D: Debug
-            D) debug=true ;;
+            # -v: Verbose
+            # -D: Backward-compatible alias for the old flag.
+            D|v) verbose=true ;;
 
             ##
             # -w: Only display the repo's location, like which for executables.
@@ -197,7 +198,7 @@ cdc() {
             ##
             # If the option isn't supported, tell the user and exit.
             *)
-                _cdc_print 'error' 'Invalid option.' $debug
+                _cdc_print 'error' 'Invalid option.' $verbose
                 return 1
                 ;;
         esac
@@ -229,32 +230,32 @@ cdc() {
         unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
     fi
 
-    if [[ $debug == true ]]; then
-        _cdc_print_debug_env
+    if [[ $verbose == true ]]; then
+        _cdc_print_verbose_env
     fi
 
     ##
     # Standalone actions (-l, -d, -p, etc.) do not accept directory operands or
     # directory modifiers because they complete the whole command by themselves.
     if (( terminal_action_count > 1 )); then
-        _cdc_print 'error' 'Use only one standalone option at a time.' $debug
+        _cdc_print 'error' 'Use only one standalone option at a time.' $verbose
         return 1
     fi
 
     if (( terminal_action_count == 1 )) && [[ $has_directory_modifier == true ]]; then
-        _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $debug
+        _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
         return 1
     fi
 
     if [[ $cdc_delete_history == true ]]; then
         if (( $# != 1 )); then
-            _cdc_print 'error' 'History delete requires a directory.' $debug
-            _cdc_print 'error' '  Use `-h` for more help' $debug
+            _cdc_print 'error' 'History delete requires a directory.' $verbose
+            _cdc_print 'error' '  Use `-h` for more help' $verbose
             return 1
         fi
     elif (( terminal_action_count == 1 )) && (( $# != 0 )); then
-        _cdc_print 'error' 'Standalone options do not accept a directory.' $debug
-        _cdc_print 'error' '  Use `-h` for more help' $debug
+        _cdc_print 'error' 'Standalone options do not accept a directory.' $verbose
+        _cdc_print 'error' '  Use `-h` for more help' $verbose
         return 1
     fi
 
@@ -267,7 +268,7 @@ cdc() {
     # Check for the required variables that should be exported from a shell
     # config file. If not found, exit with a non-zero return code.
     if [[ -z $CDC_DIRS ]]; then
-        _cdc_print 'error' 'You must set CDC_DIRS in a config file' $debug
+        _cdc_print 'error' 'You must set CDC_DIRS in a config file' $verbose
         return 1
     fi
 
@@ -275,47 +276,47 @@ cdc() {
     # Execute the selected option-only action. rc preserves failure from helpers
     # that report their own errors, such as empty history operations.
     if [[ $cdc_list_searched_dirs == true ]]; then
-        _cdc_list_searched_dirs "$debug"
+        _cdc_list_searched_dirs "$verbose"
         should_return=true
     fi
 
     if [[ $cdc_list_dirs == true ]]; then
-        _cdc_list_available_dirs "$debug" "$allow_hidden"
+        _cdc_list_available_dirs "$verbose" "$allow_hidden"
         should_return=true
     fi
 
     if [[ $cdc_toggle == true ]]; then
-        _cdc_history_toggle "$debug" || (( rc += 1 ))
+        _cdc_history_toggle "$verbose" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_list_ignored == true ]]; then
-        _cdc_list_ignored_dirs "$debug"
+        _cdc_list_ignored_dirs "$verbose"
         should_return=true
     fi
 
     if [[ $cdc_show_history == true ]]; then
-        _cdc_history_list "$debug" || (( rc += 1 ))
+        _cdc_history_list "$verbose" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_current == true ]]; then
-        _cdc_history_current "$debug" || (( rc += 1 ))
+        _cdc_history_current "$verbose" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_pop == true ]]; then
-        _cdc_history_pop "$debug" || (( rc += 1 ))
+        _cdc_history_pop "$verbose" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_delete_history == true ]]; then
-        _cdc_history_delete "$1" "$debug" || (( rc += 1 ))
+        _cdc_history_delete "$1" "$verbose" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_clear_history == true ]]; then
-        _cdc_history_clear "$debug"
+        _cdc_history_clear "$verbose"
         should_return=true
     fi
 
@@ -328,8 +329,8 @@ cdc() {
     ##
     # Print usage and exit if the wrong number of arguments are passed.
     if (( $# != 1 )); then
-        _cdc_print 'error' 'USAGE: cdc [OPTION] [DIRECTORY]' $debug
-        _cdc_print 'error' '  Use `-h` for more help' $debug
+        _cdc_print 'error' 'USAGE: cdc [OPTION] [DIRECTORY]' $verbose
+        _cdc_print 'error' '  Use `-h` for more help' $verbose
         return 1
     fi
 
@@ -357,10 +358,10 @@ cdc() {
     # Resolve either a configured parent directory (-P) or a child directory
     # found beneath one of the configured parents.
     if [[ $cdc_parent_dirs == true ]]; then
-        wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" "$debug")
+        wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" "$verbose")
     else
         wdir=$(_cdc_find_dir \
-            "$cd_dir" "$allow_ignored" "$repos_only" "$debug" "$allow_hidden")
+            "$cd_dir" "$allow_ignored" "$repos_only" "$verbose" "$allow_hidden")
     fi
 
     if (( $? == 0 )); then
@@ -376,9 +377,9 @@ cdc() {
         ##
         # Append any requested subdirectory after the base match is known. This
         # preserves the long-standing behavior where a missing subdirectory
-        # warns in debug mode but still resolves to the base directory.
+        # warns in verbose mode but still resolves to the base directory.
         wdir=$(_cdc_resolve_subdir \
-            "$wdir" "$cd_dir" "$subdir" "$debug" "$allow_hidden")
+            "$wdir" "$cd_dir" "$subdir" "$verbose" "$allow_hidden")
 
         ##
         # Finally, cd to the path, or display it if $which is true.
@@ -397,7 +398,7 @@ cdc() {
     ##
     # If no directory was found, print a message to stderr and return an
     # unsuccessful code.
-    _cdc_print 'error' "[$cd_dir] not found." $debug
+    _cdc_print 'error' "[$cd_dir] not found." $verbose
 
     return 2
 }
@@ -444,18 +445,18 @@ _cdc_history_push() {
 # either the full stored path or the displayed basename.
 #
 # @param string $dir
-# @param boolean $debug
+# @param boolean $verbose
 # @return boolean
 _cdc_history_delete() {
     local dir="$1"
-    local debug="$2"
+    local verbose="$2"
     local cdc_history
     local cdc_history_basename
     local cdc_deleted=false
     local -a cdc_new_history=()
 
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' 'Stack is empty.' $debug
+        _cdc_print 'error' 'Stack is empty.' $verbose
         return 1
     fi
 
@@ -471,12 +472,12 @@ _cdc_history_delete() {
     done
 
     if [[ $cdc_deleted != true ]]; then
-        _cdc_print 'error' "[$dir] not found in history." $debug
+        _cdc_print 'error' "[$dir] not found in history." $verbose
         return 1
     fi
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Deleting directories from history.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Deleting directories from history.' $verbose
     fi
 
     CDC_HISTORY=("${cdc_new_history[@]}")
@@ -485,13 +486,13 @@ _cdc_history_delete() {
 ##
 # Clear the history stack.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @return void
 _cdc_history_clear() {
-    local debug="$1"
+    local verbose="$1"
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Clearing history.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Clearing history.' $verbose
     fi
 
     CDC_HISTORY=()
@@ -554,10 +555,10 @@ _cdc_child_dirs() {
 }
 
 ##
-# Print the debug environment report.
+# Print the verbose environment report.
 #
 # @return void
-_cdc_print_debug_env() {
+_cdc_print_verbose_env() {
     local cdc_dir
     local cdc_ignore
 
@@ -617,7 +618,7 @@ _cdc_option_specs() {
     printf "%s\t%s\t%s\n" 'X' 'terminal' 'Clear the history stack'
     printf "%s\t%s\t%s\n" 'r' 'directory' 'Only cd to repositories'
     printf "%s\t%s\t%s\n" 'R' 'directory' 'cd to any directory, even if it is not a repository'
-    printf "%s\t%s\t%s\n" 'D' 'directory' 'Enable debug mode for unexpected behavior'
+    printf "%s\t%s\t%s\n" 'v' 'directory' 'Enable verbose output'
     printf "%s\t%s\t%s\n" 'w' 'directory' 'Print the directory location instead of changing to it'
     printf "%s\t%s\t%s\n" 'h' 'terminal' 'Print this help'
 }
@@ -645,13 +646,13 @@ _cdc_print_help() {
 ##
 # List the directories cdc searches.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @return void
 _cdc_list_searched_dirs() {
-    local debug="$1"
+    local verbose="$1"
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Listing searched directories.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Listing searched directories.' $verbose
     fi
 
     _cdc_parse_colon_string "$CDC_DIRS" | column
@@ -660,23 +661,23 @@ _cdc_list_searched_dirs() {
 ##
 # List the directories cdc can change to.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @param boolean $allow_hidden
 # @return void
 _cdc_list_available_dirs() {
-    local debug="$1"
+    local verbose="$1"
     local allow_hidden="${2:-${CDC_ALLOW_HIDDEN:-false}}"
     local list
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Listing available directories.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Listing available directories.' $verbose
     fi
 
     ##
     # Print the list and pipe to column for nice output. Also pad each element
     # to make them all at least 8 characters long. This is done because column
     # has issues printing strings less than 8 bytes.
-    _cdc_repo_list "$debug" "$allow_hidden" | while IFS= read -r list; do
+    _cdc_repo_list "$verbose" "$allow_hidden" | while IFS= read -r list; do
         printf "%-8s\n" "$list"
     done | column
 }
@@ -684,10 +685,10 @@ _cdc_list_available_dirs() {
 ##
 # List the directories cdc ignores.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @return void
 _cdc_list_ignored_dirs() {
-    local debug="$1"
+    local verbose="$1"
     local cdc_ignore_count=0
     local cdc_ignore
 
@@ -698,12 +699,12 @@ _cdc_list_ignored_dirs() {
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
 
     if (( cdc_ignore_count == 0 )); then
-        if [[ $debug == true ]]; then
-            _cdc_print 'warn' 'No directories are being ignored.' $debug
+        if [[ $verbose == true ]]; then
+            _cdc_print 'warn' 'No directories are being ignored.' $verbose
         fi
     else
-        if [[ $debug == true ]]; then
-            _cdc_print 'success' 'Listing ignored directories.' $debug
+        if [[ $verbose == true ]]; then
+            _cdc_print 'success' 'Listing ignored directories.' $verbose
         fi
 
         _cdc_parse_colon_string "$CDC_IGNORE" | column
@@ -713,10 +714,10 @@ _cdc_list_ignored_dirs() {
 ##
 # Toggle between the last two directories in the history stack.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @return boolean
 _cdc_history_toggle() {
-    local debug="$1"
+    local verbose="$1"
     local cdc_last_element
     local cdc_next_to_last_element
     local cdc_last_index
@@ -725,12 +726,12 @@ _cdc_history_toggle() {
     ##
     # If the stack doesn't have at least two elements, tell the user.
     if (( ${#CDC_HISTORY[@]} < 2 )); then
-        _cdc_print 'error' 'Not enough directories in the stack.' $debug
+        _cdc_print 'error' 'Not enough directories in the stack.' $verbose
         return 1
     fi
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Toggling between last two directories.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Toggling between last two directories.' $verbose
     fi
 
     ##
@@ -756,27 +757,31 @@ _cdc_history_toggle() {
 ##
 # List cdc history.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @return boolean
 _cdc_history_list() {
-    local debug="$1"
+    local verbose="$1"
     local cdc_history
 
     ##
     # If the stack is empty, tell the user.
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' 'Stack is empty.' $debug
+        _cdc_print 'error' 'Stack is empty.' $verbose
         return 1
     fi
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Listing directories in history.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Listing directories in history.' $verbose
     fi
 
     ##
     # Print the array.
     for cdc_history in "${CDC_HISTORY[@]}"; do
-        printf "%s " "${cdc_history##*/}"
+        if [[ $verbose == true ]]; then
+            printf "%s " "$cdc_history"
+        else
+            printf "%s " "${cdc_history##*/}"
+        fi
     done
     echo
 }
@@ -784,21 +789,21 @@ _cdc_history_list() {
 ##
 # Change to the current directory in history.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @return boolean
 _cdc_history_current() {
-    local debug="$1"
+    local verbose="$1"
     local cdc_last_index
 
     ##
     # If the stack is empty, tell the user.
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' "Stack is empty." $debug
+        _cdc_print 'error' "Stack is empty." $verbose
         return 1
     fi
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Changing to current directory in history.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Changing to current directory in history.' $verbose
     fi
 
     ##
@@ -812,24 +817,24 @@ _cdc_history_current() {
 ##
 # Change to the previous directory in history.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @return boolean
 _cdc_history_pop() {
-    local debug="$1"
+    local verbose="$1"
     local cdc_last_index
 
     ##
     # If there aren't enough directories to pop, notify the user.
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' 'Stack is empty.' $debug
+        _cdc_print 'error' 'Stack is empty.' $verbose
         return 1
     elif (( ${#CDC_HISTORY[@]} == 1 )); then
-        _cdc_print 'error' 'At beginning of stack.' $debug
+        _cdc_print 'error' 'At beginning of stack.' $verbose
         return 1
     fi
 
-    if [[ $debug == true ]]; then
-        _cdc_print 'success' 'Changing to last directory in history.' $debug
+    if [[ $verbose == true ]]; then
+        _cdc_print 'success' 'Changing to last directory in history.' $verbose
     fi
 
     ##
@@ -912,14 +917,14 @@ _cdc_array_next_to_last_index() {
 # @param string $cd_dir
 # @param boolean $allow_ignored
 # @param boolean $repos_only
-# @param boolean $debug
+# @param boolean $verbose
 # @param boolean $allow_hidden
 # @return string
 _cdc_find_dir() {
     local cd_dir="$1"
     local allow_ignored="$2"
     local repos_only="$3"
-    local debug="$4"
+    local verbose="$4"
     local allow_hidden="${5:-${CDC_ALLOW_HIDDEN:-false}}"
     local dir
 
@@ -931,9 +936,9 @@ _cdc_find_dir() {
         # If a path is in CDC_DIRS but doesn't exist, print a message to stderr
         # and move on to the next configured path.
         if ! [[ -d $dir ]]; then
-            if [[ $debug == true ]]; then
+            if [[ $verbose == true ]]; then
                 _cdc_print 'warn' \
-                    "$dir is in CDC_DIRS but isn't a directory." $debug
+                    "$dir is in CDC_DIRS but isn't a directory." $verbose
             fi
             continue
         fi
@@ -946,18 +951,18 @@ _cdc_find_dir() {
         ##
         # If the directory exists, but is excluded, skip it.
         elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$cd_dir"; then
-            if [[ $debug == true ]]; then
-                _cdc_print 'warn' 'Match was found but it is ignored.' $debug
+            if [[ $verbose == true ]]; then
+                _cdc_print 'warn' 'Match was found but it is ignored.' $verbose
             fi
             continue
 
         ##
         # If the directory exists, but is hidden, skip it unless allowed.
         elif [[ $allow_hidden == false ]] && _cdc_is_hidden_dir "$cd_dir"; then
-            if [[ $debug == true ]]; then
+            if [[ $verbose == true ]]; then
                 _cdc_print 'warn' \
                     'Match was found but hidden directories are not allowed.' \
-                    $debug
+                    $verbose
             fi
             continue
 
@@ -965,9 +970,9 @@ _cdc_find_dir() {
         # If the directory exists, but we're in repos-only mode and the
         # directory isn't a repo, skip it.
         elif [[ $repos_only == true ]] && ! _cdc_is_repo_dir "$dir/$cd_dir"; then
-            if [[ $debug == true ]]; then
+            if [[ $verbose == true ]]; then
                 _cdc_print 'warn' \
-                    'Match was found but it is not a repository.' $debug
+                    'Match was found but it is not a repository.' $verbose
             fi
             continue
         fi
@@ -987,12 +992,12 @@ _cdc_find_dir() {
 #
 # @param string $cd_dir
 # @param boolean $allow_ignored
-# @param boolean $debug
+# @param boolean $verbose
 # @return string
 _cdc_find_parent_dir() {
     local cd_dir="$1"
     local allow_ignored="$2"
-    local debug="$3"
+    local verbose="$3"
     local dir
     local parent_dir
 
@@ -1000,9 +1005,9 @@ _cdc_find_parent_dir() {
         [[ -n $dir ]] || continue
 
         if ! [[ -d $dir ]]; then
-            if [[ $debug == true ]]; then
+            if [[ $verbose == true ]]; then
                 _cdc_print 'warn' \
-                    "$dir is in CDC_DIRS but isn't a directory." $debug
+                    "$dir is in CDC_DIRS but isn't a directory." $verbose
             fi
             continue
         fi
@@ -1016,8 +1021,8 @@ _cdc_find_parent_dir() {
         if [[ $parent_dir != "$cd_dir" ]]; then
             continue
         elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$parent_dir"; then
-            if [[ $debug == true ]]; then
-                _cdc_print 'warn' 'Match was found but it is ignored.' $debug
+            if [[ $verbose == true ]]; then
+                _cdc_print 'warn' 'Match was found but it is ignored.' $verbose
             fi
             continue
         fi
@@ -1035,14 +1040,14 @@ _cdc_find_parent_dir() {
 # @param string $wdir
 # @param string $cd_dir
 # @param string $subdir
-# @param boolean $debug
+# @param boolean $verbose
 # @param boolean $allow_hidden
 # @return string
 _cdc_resolve_subdir() {
     local wdir="$1"
     local cd_dir="$2"
     local subdir="$3"
-    local debug="$4"
+    local verbose="$4"
     local allow_hidden="${5:-${CDC_ALLOW_HIDDEN:-false}}"
 
     ##
@@ -1056,10 +1061,10 @@ _cdc_resolve_subdir() {
         if [[ -d $wdir/$subdir ]] \
             && [[ $allow_hidden == false ]] \
             && _cdc_path_contains_hidden_dir "$subdir"; then
-            if [[ $debug == true ]]; then
+            if [[ $verbose == true ]]; then
                 _cdc_print 'warn' \
                     'Match was found but hidden directories are not allowed.' \
-                    $debug
+                    $verbose
             fi
         ##
         # If it exists as an allowed directory, append it to the path.
@@ -1069,8 +1074,8 @@ _cdc_resolve_subdir() {
 
             ##
             # If it doesn't exist as a directory, print message to stderr.
-            if [[ $debug == true ]]; then
-                _cdc_print 'warn' "$subdir does not exist in $cd_dir." $debug
+            if [[ $verbose == true ]]; then
+                _cdc_print 'warn' "$subdir does not exist in $cd_dir." $verbose
             fi
         fi
     fi
@@ -1151,7 +1156,7 @@ _cdc_path_contains_hidden_dir() {
 ##
 # Lists directories found in CDC_DIRS that aren't excluded.
 #
-# @param boolean $debug
+# @param boolean $verbose
 # @param boolean $allow_hidden
 # @return string
 _cdc_repo_list() {
@@ -1159,7 +1164,7 @@ _cdc_repo_list() {
     local subdir
     local fulldir
     local directories=()
-    local debug=${1:-false}
+    local verbose=${1:-false}
     local allow_hidden="${2:-${CDC_ALLOW_HIDDEN:-false}}"
 
     ##
@@ -1169,7 +1174,7 @@ _cdc_repo_list() {
         ##
         # If the element isn't a directory that exists, move on.
         if ! [[ -d $dir ]]; then
-            if [[ $debug == true ]]; then
+            if [[ $verbose == true ]]; then
                 _cdc_print 'warn' \
                     "$dir is in CDC_DIRS but isn't a directory."
             fi
@@ -1251,16 +1256,16 @@ _cdc_is_repo_dir() {
 #
 # @param string $level
 # @param string $message
-# @param boolean $debug
+# @param boolean $verbose
 # @return void
 _cdc_print() {
     local level="$1"
     local message="$2"
-    local debug="$3"
+    local verbose="$3"
 
     ##
-    # If we're not debugging, just print the message and return.
-    if [[ $debug == false ]]; then
+    # If verbose output is disabled, just print the message and return.
+    if [[ $verbose == false ]]; then
         printf "%s\n" "$message"
         return
     fi
@@ -1278,7 +1283,7 @@ _cdc_print() {
             printf "${CDC_ERROR_COLOR}ERROR:${CDC_RESET} $message\n" >&2
             ;;
         ##
-        # Hijacking this function to also print our debug booleans.
+        # Hijacking this function to also print our verbose booleans.
         'boolean')
             ##
             # If the variable is true, return with success color.
