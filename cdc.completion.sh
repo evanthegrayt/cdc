@@ -63,6 +63,14 @@ _cdc_completion_terminal_options() {
 }
 
 ##
+# List command-line flags that accept a history stack operand.
+#
+# @return string
+_cdc_completion_history_options() {
+    _cdc_completion_options_by_kind history
+}
+
+##
 # List command-line flags that still allow a directory argument.
 #
 # @return string
@@ -116,6 +124,37 @@ _cdc_completion_has_terminal_action() {
             opts="${opts#?}"
 
             [[ $(_cdc_completion_option_kind "$opt") == terminal ]] && return 0
+        done
+    done
+
+    return 1
+}
+
+##
+# Does a set of already-typed arguments include a history action?
+#
+# @param array $@
+# @return boolean
+_cdc_completion_has_history_action() {
+    local arg
+    local opt
+    local opts
+
+    for arg in "$@"; do
+        ##
+        # `--` ends option parsing. Anything after it is an operand, so there is
+        # no history action for completion to honor.
+        [[ $arg == -- ]] && return 1
+        [[ $arg == -* && $arg != "-" ]] || continue
+
+        ##
+        # Combined short options like -xD are expanded one character at a time.
+        opts="${arg#-}"
+        while [[ -n $opts ]]; do
+            opt="${opts%"${opts#?}"}"
+            opts="${opts#?}"
+
+            [[ $(_cdc_completion_option_kind "$opt") == history ]] && return 0
         done
     done
 
@@ -245,6 +284,36 @@ _cdc_completion_parent_list() {
 
         echo "$parent_dir"
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
+}
+
+##
+# List unique history basenames for completion.
+#
+# @param string $current
+# @return string
+_cdc_completion_history_list() {
+    local current="$1"
+    local cdc_history
+    local cdc_history_basename
+    local cdc_seen_history
+    local cdc_seen
+    local -a cdc_history_basenames=()
+
+    for cdc_history in "${CDC_HISTORY[@]}"; do
+        cdc_history_basename="${cdc_history##*/}"
+        cdc_seen=false
+
+        for cdc_seen_history in "${cdc_history_basenames[@]}"; do
+            if [[ $cdc_seen_history == "$cdc_history_basename" ]]; then
+                cdc_seen=true
+                break
+            fi
+        done
+
+        [[ $cdc_seen == true ]] && continue
+        cdc_history_basenames+=("$cdc_history_basename")
+        printf "%s\n" "$cdc_history_basename"
+    done | _cdc_completion_filter "$current"
 }
 
 ##

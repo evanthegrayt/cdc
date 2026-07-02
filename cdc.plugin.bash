@@ -48,6 +48,21 @@ _cdc_complete() {
         return 0
     fi
 
+    if _cdc_completion_has_history_action "${args[@]}"; then
+        if _cdc_completion_has_operand "${args[@]}"; then
+            COMPREPLY=()
+            return 0
+        fi
+
+        candidates="$(_cdc_completion_history_list "$cur")"
+        COMPREPLY=()
+        while IFS= read -r candidate; do
+            [[ -n $candidate ]] || continue
+            COMPREPLY+=("$candidate")
+        done <<< "$candidates"
+        return 0
+    fi
+
     if _cdc_completion_has_operand "${args[@]}"; then
         # cdc accepts a single directory operand, so stop after one is present.
         COMPREPLY=()
@@ -56,7 +71,7 @@ _cdc_complete() {
 
     if [[ $cur == -* ]]; then
         # compgen filters a word list to values matching the current word.
-        COMPREPLY=( $( compgen -W "$(_cdc_completion_terminal_options) $(_cdc_completion_directory_options)" -- "$cur" ) )
+        COMPREPLY=( $( compgen -W "$(_cdc_completion_terminal_options) $(_cdc_completion_history_options) $(_cdc_completion_directory_options)" -- "$cur" ) )
         return 0
     fi
 

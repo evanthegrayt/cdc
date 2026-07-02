@@ -21,6 +21,8 @@ cdc() {
     local cdc_current=false
     local cdc_pop=false
     local cdc_show_history=false
+    local cdc_delete_history=false
+    local cdc_clear_history=false
     local cdc_list_ignored=false
     local cdc_parent_dirs=false
     local print_help=false
@@ -49,7 +51,7 @@ cdc() {
     ##
     # Parse short options. getopts errors are suppressed so unsupported flags
     # can use cdc's own error text instead of shell-generated messages.
-    while getopts 'acCdDhiHlLnPprRtuUw' opt 2>/dev/null; do
+    while getopts 'acCdDhiHlLnPprRtuUwxX' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -120,6 +122,20 @@ cdc() {
             # -p: cd to the last element in the stack and pop it from the array.
             p)
                 cdc_pop=true
+                (( terminal_action_count += 1 ))
+                ;;
+
+            ##
+            # -x: Delete matching directories from the history stack.
+            x)
+                cdc_delete_history=true
+                (( terminal_action_count += 1 ))
+                ;;
+
+            ##
+            # -X: Clear the history stack.
+            X)
+                cdc_clear_history=true
                 (( terminal_action_count += 1 ))
                 ;;
 
@@ -230,7 +246,13 @@ cdc() {
         return 1
     fi
 
-    if (( terminal_action_count == 1 )) && (( $# != 0 )); then
+    if [[ $cdc_delete_history == true ]]; then
+        if (( $# != 1 )); then
+            _cdc_print 'error' 'History delete requires a directory.' $debug
+            _cdc_print 'error' '  Use `-h` for more help' $debug
+            return 1
+        fi
+    elif (( terminal_action_count == 1 )) && (( $# != 0 )); then
         _cdc_print 'error' 'Standalone options do not accept a directory.' $debug
         _cdc_print 'error' '  Use `-h` for more help' $debug
         return 1
@@ -284,6 +306,16 @@ cdc() {
 
     if [[ $cdc_pop == true ]]; then
         _cdc_history_pop "$debug" || (( rc += 1 ))
+        should_return=true
+    fi
+
+    if [[ $cdc_delete_history == true ]]; then
+        _cdc_history_delete "$1" "$debug" || (( rc += 1 ))
+        should_return=true
+    fi
+
+    if [[ $cdc_clear_history == true ]]; then
+        _cdc_history_clear "$debug"
         should_return=true
     fi
 
@@ -406,6 +438,66 @@ _cdc_history_push() {
 }
 
 ##
+# Delete matching directories from the history stack.
+#
+# The match is intentionally limited to existing history entries, accepting
+# either the full stored path or the displayed basename.
+#
+# @param string $dir
+# @param boolean $debug
+# @return boolean
+_cdc_history_delete() {
+    local dir="$1"
+    local debug="$2"
+    local cdc_history
+    local cdc_history_basename
+    local cdc_deleted=false
+    local -a cdc_new_history=()
+
+    if (( ${#CDC_HISTORY[@]} == 0 )); then
+        _cdc_print 'error' 'Stack is empty.' $debug
+        return 1
+    fi
+
+    for cdc_history in "${CDC_HISTORY[@]}"; do
+        cdc_history_basename="${cdc_history##*/}"
+
+        if [[ $cdc_history == "$dir" || $cdc_history_basename == "$dir" ]]; then
+            cdc_deleted=true
+            continue
+        fi
+
+        cdc_new_history+=("$cdc_history")
+    done
+
+    if [[ $cdc_deleted != true ]]; then
+        _cdc_print 'error' "[$dir] not found in history." $debug
+        return 1
+    fi
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Deleting directories from history.' $debug
+    fi
+
+    CDC_HISTORY=("${cdc_new_history[@]}")
+}
+
+##
+# Clear the history stack.
+#
+# @param boolean $debug
+# @return void
+_cdc_history_clear() {
+    local debug="$1"
+
+    if [[ $debug == true ]]; then
+        _cdc_print 'success' 'Clearing history.' $debug
+    fi
+
+    CDC_HISTORY=()
+}
+
+##
 # Split a colon-delimited string into one path per line.
 #
 # @param string $string
@@ -521,6 +613,8 @@ _cdc_option_specs() {
     printf "%s\t%s\t%s\n" 't' 'terminal' 'Toggle between the last two directories in the stack'
     printf "%s\t%s\t%s\n" 'u' 'directory' 'Push the directory onto the stack'
     printf "%s\t%s\t%s\n" 'U' 'directory' 'Do not push the directory onto the stack'
+    printf "%s\t%s\t%s\n" 'x' 'history' 'Delete matching directories from the stack'
+    printf "%s\t%s\t%s\n" 'X' 'terminal' 'Clear the history stack'
     printf "%s\t%s\t%s\n" 'r' 'directory' 'Only cd to repositories'
     printf "%s\t%s\t%s\n" 'R' 'directory' 'cd to any directory, even if it is not a repository'
     printf "%s\t%s\t%s\n" 'D' 'directory' 'Enable debug mode for unexpected behavior'

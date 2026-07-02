@@ -246,8 +246,10 @@ The plugin comes with a few available options. Some are for dealing with the
 directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
 overriding variables set in a shell config file. There's also a debug mode.
 Options that change a directory lookup can be combined, such as `-aRw` or
-`-PU`. Standalone action options (`-l`, `-L`, `-i`, `-d`, `-n`, `-t`, `-p`, and
-`-h`) should be used one at a time, without a directory argument.
+`-PU`. Standalone action options (`-l`, `-L`, `-i`, `-d`, `-n`, `-t`, `-p`,
+`-X`, and `-h`) should be used one at a time, without a directory argument.
+The `-x` history action is also standalone, but requires one directory operand
+to delete matching entries from the history stack.
 
 |Flag|What it does|
 |:------|:-----------|
@@ -265,6 +267,8 @@ Options that change a directory lookup can be combined, such as `-aRw` or
 |-P|`cd` to a configured parent directory from `CDC_DIRS`.|
 |-u|Push the directory onto the stack. Similar to the `pushd` command.|
 |-U|Do not push the directory onto the stack.|
+|-x|Delete matching directories from the history stack.|
+|-X|Clear the history stack.|
 |-r|Only `cd` to repositories.|
 |-R|`cd` to the directory even if it's not a repository.|
 |-D|Debug mode. Enables warnings for when things aren't working as expected.|
