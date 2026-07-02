@@ -245,6 +245,26 @@ setup() {
     assert_file_equals "$BATS_TEST_TMPDIR/ignored.out" "$CDC_FIXTURE/two/ignored"
 }
 
+@test "CDC_IGNORE full paths only ignore the matching directory" {
+    mkdir -p "$CDC_FIXTURE/one/ignored"
+
+    export CDC_IGNORE=ignored/
+    run cdc -w ignored
+    assert_failure_status 2
+    [ "$output" = "[ignored] not found." ]
+
+    export CDC_DIRS="$CDC_FIXTURE/one/:$CDC_FIXTURE/two/:$CDC_FIXTURE/three/"
+    export CDC_IGNORE="$CDC_FIXTURE/one/ignored/"
+
+    cdc -w ignored >"$BATS_TEST_TMPDIR/path-ignored.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/path-ignored.out" "$CDC_FIXTURE/two/ignored"
+
+    cdc -a -w ignored >"$BATS_TEST_TMPDIR/path-ignored-allowed.out"
+    assert_file_equals \
+        "$BATS_TEST_TMPDIR/path-ignored-allowed.out" \
+        "$CDC_FIXTURE/one/ignored"
+}
+
 @test "repo-only mode can be enabled by env and overridden by -R" {
     export CDC_REPOS_ONLY=true
 

@@ -123,12 +123,17 @@ welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
 ### Ignoring certain directories
 If you have directories within `CDC_DIRS` that you want the plugin to ignore,
 you can `export CDC_IGNORE` to a string containing those directories. These
-elements should only be the directory base-name, **not** the absolute path.
-"Ignoring" a directory will prevent it from being "seen" by `cdc`.
+elements can be directory base-names, or full paths to specific directories.
+Bare names match any directory with that name in `CDC_DIRS`; full paths only
+match that exact directory. "Ignoring" a directory will prevent it from being
+"seen" by `cdc`.
 
 ```sh
 # Assuming you never want to `cdc notes_directory`:
 export CDC_IGNORE=notes_directory:training
+
+# Assuming you only want to ignore one specific notes directory:
+export CDC_IGNORE="$HOME/work/private/notes:training"
 ```
 
 ### Including hidden directories in listings and completion

@@ -245,7 +245,7 @@ _cdc_completion_repo_list() {
             subdir=${fulldir%/}
             subdir=${subdir##*/}
 
-            if [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$subdir"; then
+            if [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$fulldir"; then
                 continue
             fi
 
@@ -266,19 +266,20 @@ _cdc_completion_repo_list() {
 _cdc_completion_parent_list() {
     local allow_ignored="$1"
     local dir
+    local dir_path
     local parent_dir
 
     while IFS= read -r dir; do
         [[ -d $dir ]] || continue
+        dir_path=$(_cdc_normalize_dir_path "$dir")
 
         ##
         # -P completes the configured parents themselves, not their children.
         # Hidden configured parents are explicit CDC_DIRS entries and remain
         # visible; CDC_IGNORE still applies by basename.
-        parent_dir=${dir%/}
-        parent_dir=${parent_dir##*/}
+        parent_dir=${dir_path##*/}
 
-        if [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$parent_dir"; then
+        if [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$dir_path"; then
             continue
         fi
 

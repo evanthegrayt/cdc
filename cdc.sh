@@ -520,6 +520,21 @@ _cdc_parse_colon_string() {
 }
 
 ##
+# Remove trailing slashes from a directory path, preserving root.
+#
+# @param string $path
+# @return string
+_cdc_normalize_dir_path() {
+    local path="$1"
+
+    while [[ $path == */ && $path != / ]]; do
+        path=${path%/}
+    done
+
+    printf "%s\n" "$path"
+}
+
+##
 # List child directories under a parent path.
 #
 # @param string $dir
@@ -529,6 +544,8 @@ _cdc_child_dirs() {
     local dir="$1"
     local allow_hidden="${2:-false}"
     local fulldir
+
+    dir=$(_cdc_normalize_dir_path "$dir")
 
     ##
     # zsh raises an error for non-matching globs by default; bash leaves the
@@ -927,6 +944,7 @@ _cdc_find_dir() {
     local verbose="$4"
     local allow_hidden="${5:-${CDC_ALLOW_HIDDEN:-false}}"
     local dir
+    local dir_path
 
     ##
     # Loop through every path in the colon-delimited CDC_DIRS value.
@@ -942,15 +960,17 @@ _cdc_find_dir() {
             fi
             continue
         fi
+        dir_path=$(_cdc_normalize_dir_path "$dir")
 
         ##
         # If the element is not a directory, skip it.
-        if [[ ! -d $dir/$cd_dir ]]; then
+        if [[ ! -d $dir_path/$cd_dir ]]; then
             continue
 
         ##
         # If the directory exists, but is excluded, skip it.
-        elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$cd_dir"; then
+        elif [[ $allow_ignored == false ]] \
+            && _cdc_is_excluded_dir "$dir_path/$cd_dir"; then
             if [[ $verbose == true ]]; then
                 _cdc_print 'warn' 'Match was found but it is ignored.' $verbose
             fi
@@ -969,7 +989,8 @@ _cdc_find_dir() {
         ##
         # If the directory exists, but we're in repos-only mode and the
         # directory isn't a repo, skip it.
-        elif [[ $repos_only == true ]] && ! _cdc_is_repo_dir "$dir/$cd_dir"; then
+        elif [[ $repos_only == true ]] \
+            && ! _cdc_is_repo_dir "$dir_path/$cd_dir"; then
             if [[ $verbose == true ]]; then
                 _cdc_print 'warn' \
                     'Match was found but it is not a repository.' $verbose
@@ -980,7 +1001,7 @@ _cdc_find_dir() {
         ##
         # By this point, the match exists and passed ignore/hidden/repo checks,
         # so print the absolute path for the caller.
-        echo "$dir/$cd_dir"
+        echo "$dir_path/$cd_dir"
         return 0
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
 
@@ -999,6 +1020,7 @@ _cdc_find_parent_dir() {
     local allow_ignored="$2"
     local verbose="$3"
     local dir
+    local dir_path
     local parent_dir
 
     while IFS= read -r dir; do
@@ -1011,16 +1033,16 @@ _cdc_find_parent_dir() {
             fi
             continue
         fi
+        dir_path=$(_cdc_normalize_dir_path "$dir")
 
-        parent_dir=${dir%/}
-        parent_dir=${parent_dir##*/}
+        parent_dir=${dir_path##*/}
 
         ##
         # -P searches configured CDC_DIRS entries by basename. Hidden configured
         # parents are explicit entries and are not gated by CDC_ALLOW_HIDDEN.
         if [[ $parent_dir != "$cd_dir" ]]; then
             continue
-        elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$parent_dir"; then
+        elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$dir_path"; then
             if [[ $verbose == true ]]; then
                 _cdc_print 'warn' 'Match was found but it is ignored.' $verbose
             fi
@@ -1090,7 +1112,11 @@ _cdc_resolve_subdir() {
 # @return boolean
 _cdc_is_excluded_dir() {
     local element
+    local ignored_path
+    local ignored_basename
     local string="$1"
+    local string_basename
+    local string_path
 
     ##
     # If CDC_IGNORE isn't defined or is empty, return "false".
@@ -1098,14 +1124,24 @@ _cdc_is_excluded_dir() {
         return 1
     fi
 
+    string_path=$(_cdc_normalize_dir_path "$string")
+    string_basename=${string_path##*/}
+
     ##
     # Loop through each ignored name in the colon-delimited CDC_IGNORE value.
     while IFS= read -r element; do
+        [[ -n $element ]] || continue
+        ignored_path=$(_cdc_normalize_dir_path "$element")
+        ignored_basename=${ignored_path##*/}
 
         ##
-        # If the element matches the passed string, return "true" to indicate
-        # it's excluded.
-        if [[ ${element/\//} == ${string/\//} ]]; then
+        # Path-like entries only ignore that exact directory, while bare names
+        # keep matching any directory with that basename.
+        if [[ $ignored_path == */* ]]; then
+            if [[ $ignored_path == "$string_path" ]]; then
+                return 0
+            fi
+        elif [[ $ignored_basename == "$string_basename" ]]; then
             return 0
         fi
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
@@ -1200,7 +1236,7 @@ _cdc_repo_list() {
 
             ##
             # If the directory isn't excluded, add it to the array.
-            if ! _cdc_is_excluded_dir "$subdir"; then
+            if ! _cdc_is_excluded_dir "$fulldir"; then
                 directories+=("$subdir")
             fi
         done < <(_cdc_child_dirs "$dir" "$allow_hidden")
