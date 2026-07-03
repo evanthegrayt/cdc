@@ -31,10 +31,10 @@ cdc() {
     local allow_hidden=${CDC_ALLOW_HIDDEN:-false}
     local pushdir_option_set=false
     local use_color=${CDC_COLOR:-true}
-    local CDC_ERROR_COLOR="$CDC_ERROR_COLOR"
-    local CDC_SUCCESS_COLOR="$CDC_SUCCESS_COLOR"
-    local CDC_WARNING_COLOR="$CDC_WARNING_COLOR"
-    local CDC_RESET="$CDC_RESET"
+    local error_color=${CDC_ERROR_COLOR:-'\033[0;31m'}
+    local success_color=${CDC_SUCCESS_COLOR:-'\033[0;32m'}
+    local warning_color=${CDC_WARNING_COLOR:-'\033[0;33m'}
+    local reset_color='\033[0m'
 
     ##
     # The default for auto-push is true. The user can set `CDC_AUTO_PUSH=false`
@@ -219,17 +219,6 @@ cdc() {
     fi
 
     ##
-    # If colors are enabled, set color values for this cdc call. These are
-    # local to avoid leaving default color variables in the user's shell.
-    if [[ $use_color == true ]]; then
-        : ${CDC_ERROR_COLOR:='\033[0;31m'}
-        : ${CDC_SUCCESS_COLOR:='\033[0;32m'}
-        : ${CDC_WARNING_COLOR:='\033[0;33m'}
-        CDC_RESET='\033[0m'
-    else
-        unset CDC_ERROR_COLOR CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_RESET
-    fi
-
     if [[ $verbose == true ]]; then
         _cdc_print_verbose_env
     fi
@@ -580,19 +569,30 @@ _cdc_child_dirs() {
 _cdc_print_verbose_env() {
     local cdc_dir
     local cdc_ignore
+    local success_prefix
+    local warning_prefix
+    local error_prefix
+    local reset_prefix
+
+    if [[ $use_color == true ]]; then
+        success_prefix="$success_color"
+        warning_prefix="$warning_color"
+        error_prefix="$error_color"
+        reset_prefix="$reset_color"
+    fi
 
     echo "========================= ENV ==========================="
     while IFS= read -r cdc_dir; do
-        printf "CDC_DIRS          += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
-            "$cdc_dir"
+        printf "CDC_DIRS          += %b%s%b\n" \
+            "$success_prefix" "$cdc_dir" "$reset_prefix"
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
     while IFS= read -r cdc_dir; do
-        printf "CDC_EXPLICIT_DIRS += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
-            "$cdc_dir"
+        printf "CDC_EXPLICIT_DIRS += %b%s%b\n" \
+            "$success_prefix" "$cdc_dir" "$reset_prefix"
     done < <(_cdc_parse_colon_string "$CDC_EXPLICIT_DIRS")
     while IFS= read -r cdc_ignore; do
-        printf "CDC_IGNORE        += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
-            "$cdc_ignore"
+        printf "CDC_IGNORE        += %b%s%b\n" \
+            "$error_prefix" "$cdc_ignore" "$reset_prefix"
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
     echo
     printf "CDC_AUTO_PUSH     = %s\n" \
@@ -606,12 +606,12 @@ _cdc_print_verbose_env() {
     printf "CDC_COLOR         = %s\n" \
         $( _cdc_print 'boolean' $CDC_COLOR )
     echo
-    printf "CDC_SUCCESS_COLOR = $CDC_SUCCESS_COLOR%s$CDC_RESET\n"\
-        "$CDC_SUCCESS_COLOR"
-    printf "CDC_WARNING_COLOR = $CDC_WARNING_COLOR%s$CDC_RESET\n"\
-        "$CDC_WARNING_COLOR"
-    printf "CDC_ERROR_COLOR   = $CDC_ERROR_COLOR%s$CDC_RESET\n"\
-        "$CDC_ERROR_COLOR"
+    printf "CDC_SUCCESS_COLOR = %b%s%b\n" \
+        "$success_prefix" "$success_color" "$reset_prefix"
+    printf "CDC_WARNING_COLOR = %b%s%b\n" \
+        "$warning_prefix" "$warning_color" "$reset_prefix"
+    printf "CDC_ERROR_COLOR   = %b%s%b\n" \
+        "$error_prefix" "$error_color" "$reset_prefix"
     echo "======================= RUNTIME ========================="
 }
 
@@ -654,14 +654,24 @@ _cdc_print_help() {
     local opt
     local kind
     local description
+    local success_prefix
+    local warning_prefix
+    local reset_prefix
 
-    printf "${CDC_SUCCESS_COLOR}USAGE: cdc [OPTION] [DIRECTORY]$CDC_RESET"
-    printf "${CDC_WARNING_COLOR}\n\n"
+    if [[ $use_color == true ]]; then
+        success_prefix="$success_color"
+        warning_prefix="$warning_color"
+        reset_prefix="$reset_color"
+    fi
+
+    printf "%bUSAGE: cdc [OPTION] [DIRECTORY]%b" \
+        "$success_prefix" "$reset_prefix"
+    printf "%b\n\n" "$warning_prefix"
     printf 'Flags will always override options set in shell config files!'
-    printf "${CDC_RESET}\n"
+    printf "%b\n" "$reset_prefix"
 
     while IFS=$'\t' read -r opt kind description; do
-        printf "  ${CDC_WARNING_COLOR}-%s${CDC_RESET}" "$opt"
+        printf "  %b-%s%b" "$warning_prefix" "$opt" "$reset_prefix"
         printf " | %s\n" "$description"
     done < <(_cdc_option_specs)
 }
@@ -1359,6 +1369,17 @@ _cdc_print() {
     local level="$1"
     local message="$2"
     local verbose="$3"
+    local success_prefix
+    local warning_prefix
+    local error_prefix
+    local reset_prefix
+
+    if [[ $use_color == true ]]; then
+        success_prefix="$success_color"
+        warning_prefix="$warning_color"
+        error_prefix="$error_color"
+        reset_prefix="$reset_color"
+    fi
 
     ##
     # If verbose output is disabled, just print the message and return.
@@ -1371,13 +1392,16 @@ _cdc_print() {
     # Case the level of the message and print the appropriate color and message.
     case $level in
         'success')
-            printf "${CDC_SUCCESS_COLOR}SUCCESS:${CDC_RESET} $message\n"
+            printf "%bSUCCESS:%b %s\n" \
+                "$success_prefix" "$reset_prefix" "$message"
             ;;
         'warn')
-            printf "${CDC_WARNING_COLOR}WARNING:${CDC_RESET} $message\n" >&2
+            printf "%bWARNING:%b %s\n" \
+                "$warning_prefix" "$reset_prefix" "$message" >&2
             ;;
         'error')
-            printf "${CDC_ERROR_COLOR}ERROR:${CDC_RESET} $message\n" >&2
+            printf "%bERROR:%b %s\n" \
+                "$error_prefix" "$reset_prefix" "$message" >&2
             ;;
         ##
         # Hijacking this function to also print our verbose booleans.
@@ -1385,9 +1409,9 @@ _cdc_print() {
             ##
             # If the variable is true, return with success color.
             if [[ $message == true ]]; then
-                printf "${CDC_SUCCESS_COLOR}true$CDC_RESET"
+                printf "%btrue%b" "$success_prefix" "$reset_prefix"
             else
-                printf "${CDC_ERROR_COLOR}false$CDC_RESET"
+                printf "%bfalse%b" "$error_prefix" "$reset_prefix"
             fi
             ;;
     esac
