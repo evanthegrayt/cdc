@@ -697,6 +697,7 @@ setup() {
 
 @test "cdc does not leak internal variables" {
     unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only verbose
+    unset success_color warning_color error_color reset_color
     unset allow_hidden cdc_delete_history cdc_clear_history
     unset terminal_action_count has_directory_modifier CDC_RESET
     unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
@@ -713,6 +714,10 @@ setup() {
     [ -z "${pushdir_option_set+x}" ]
     [ -z "${repos_only+x}" ]
     [ -z "${verbose+x}" ]
+    [ -z "${success_color+x}" ]
+    [ -z "${warning_color+x}" ]
+    [ -z "${error_color+x}" ]
+    [ -z "${reset_color+x}" ]
     [ -z "${allow_hidden+x}" ]
     [ -z "${cdc_delete_history+x}" ]
     [ -z "${cdc_clear_history+x}" ]
@@ -737,6 +742,20 @@ setup() {
     [ "$CDC_WARNING_COLOR" = "user-warning" ]
     [ "$CDC_ERROR_COLOR" = "user-error" ]
     [ -z "${CDC_RESET+x}" ]
+}
+
+@test "cdc -C verbose report shows color values without colorizing them" {
+    export CDC_SUCCESS_COLOR='\033[1;92m'
+    export CDC_WARNING_COLOR='\033[1;93m'
+    export CDC_ERROR_COLOR='\033[1;91m'
+
+    run cdc -C -v -w repo
+
+    assert_success
+    assert_output_contains 'CDC_SUCCESS_COLOR = \033[1;92m'
+    assert_output_contains 'CDC_WARNING_COLOR = \033[1;93m'
+    assert_output_contains 'CDC_ERROR_COLOR   = \033[1;91m'
+    [[ "$output" != *$'\033'* ]]
 }
 
 @test "zsh plugin wrapper loads cdc when completion is available" {
