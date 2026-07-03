@@ -104,6 +104,67 @@ setup() {
     assert_output_contains ".hidden"
 }
 
+@test "cdc resolves explicit directories before searched directories" {
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/plain"
+
+    cdc -w plain >"$BATS_TEST_TMPDIR/explicit-plain.out"
+
+    assert_file_equals "$BATS_TEST_TMPDIR/explicit-plain.out" "$CDC_HOME/plain"
+}
+
+@test "cdc allows explicit directories regardless of ignore hidden and repo filters" {
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/plain:$CDC_HOME/.vim"
+    export CDC_IGNORE="plain:$CDC_HOME/.vim"
+    export CDC_REPOS_ONLY=true
+
+    cdc -w plain >"$BATS_TEST_TMPDIR/explicit-filtered-plain.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/explicit-filtered-plain.out" "$CDC_HOME/plain"
+
+    cdc -w .vim >"$BATS_TEST_TMPDIR/explicit-filtered-vim.out"
+    assert_file_equals "$BATS_TEST_TMPDIR/explicit-filtered-vim.out" "$CDC_HOME/.vim"
+}
+
+@test "cdc supports subdirectories under explicit directories" {
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/.vim"
+
+    cdc -w .vim/pack >"$BATS_TEST_TMPDIR/explicit-subdir.out"
+
+    assert_file_equals "$BATS_TEST_TMPDIR/explicit-subdir.out" "$CDC_HOME/.vim/pack"
+}
+
+@test "cdc can use explicit directories without CDC_DIRS" {
+    unset CDC_DIRS
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/.vim"
+
+    cdc -w .vim >"$BATS_TEST_TMPDIR/explicit-only.out"
+
+    assert_file_equals "$BATS_TEST_TMPDIR/explicit-only.out" "$CDC_HOME/.vim"
+}
+
+@test "cdc warns about missing explicit directories in verbose mode" {
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/missing:$CDC_HOME/.vim"
+
+    cdc -v -w .vim \
+        >"$BATS_TEST_TMPDIR/explicit-missing.out" \
+        2>"$BATS_TEST_TMPDIR/explicit-missing.err"
+
+    [[ "$(cat "$BATS_TEST_TMPDIR/explicit-missing.out")" == \
+        *"$CDC_HOME/.vim"* ]]
+    [[ "$(cat "$BATS_TEST_TMPDIR/explicit-missing.err")" == \
+        *"$CDC_HOME/missing is in CDC_EXPLICIT_DIRS but isn't a directory."* ]]
+}
+
+@test "cdc lists explicit directories" {
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/.vim"
+    export CDC_IGNORE=.vim
+    export CDC_REPOS_ONLY=true
+
+    run cdc -l
+
+    assert_success
+    assert_output_contains ".vim"
+}
+
 @test "cdc -U changes directories without pushing history" {
     cdc -U repo
 
@@ -597,13 +658,13 @@ setup() {
     assert_output_contains "USAGE: cdc [OPTION] [DIRECTORY]"
 }
 
-@test "cdc requires CDC_DIRS" {
+@test "cdc requires CDC_DIRS or CDC_EXPLICIT_DIRS" {
     unset CDC_DIRS
 
     run cdc repo
 
     assert_failure_status 1
-    [ "$output" = "You must set CDC_DIRS in a config file" ]
+    [ "$output" = "You must set CDC_DIRS or CDC_EXPLICIT_DIRS in a config file" ]
 }
 
 @test "cdc ignores .cdcrc files" {
@@ -947,8 +1008,32 @@ setup() {
     assert_output_contains ".hidden"
 }
 
+@test "bash completion lists explicit directories and their subdirectories" {
+    export CDC_PROJECT_ROOT
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/.vim"
+
+    run bash -c '
+        source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
+
+        COMP_WORDS=(cdc .)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+
+        COMP_WORDS=(cdc .vim/)
+        COMP_CWORD=1
+        _cdc_complete
+        printf "%s\n" "${COMPREPLY[@]}"
+    '
+
+    assert_success
+    assert_output_contains ".vim"
+    assert_output_contains ".vim/pack"
+}
+
 @test "bash completion lists configured parents with -P" {
     export CDC_PROJECT_ROOT
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/.vim"
 
     run bash -c '
         source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
@@ -966,6 +1051,7 @@ setup() {
     assert_output_not_contains "repo"
     assert_output_not_contains "plain"
     assert_output_not_contains "custom"
+    assert_output_not_contains ".vim"
 }
 
 @test "bash option completion includes verbose flag and hides legacy D flag" {
@@ -1308,8 +1394,46 @@ setup() {
     assert_output_contains ".hidden"
 }
 
+@test "zsh completion lists explicit directories and their subdirectories" {
+    export CDC_PROJECT_ROOT
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/.vim"
+
+    run zsh -c '
+        compdef() { :; }
+        compadd() {
+            while (( $# )); do
+                case "$1" in
+                    -M|-S) shift 2 ;;
+                    --) shift; break ;;
+                    "") shift ;;
+                    *) print -r -- "$1"; shift ;;
+                esac
+            done
+            while (( $# )); do
+                [[ -n $1 ]] && print -r -- "$1"
+                shift
+            done
+        }
+
+        source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
+
+        words=(cdc .)
+        CURRENT=2
+        _cdc
+
+        words=(cdc .vim/)
+        CURRENT=2
+        _cdc
+    '
+
+    assert_success
+    assert_output_contains ".vim"
+    assert_output_contains ".vim/pack"
+}
+
 @test "zsh completion lists configured parents with -P" {
     export CDC_PROJECT_ROOT
+    export CDC_EXPLICIT_DIRS="$CDC_HOME/.vim"
 
     run zsh -c '
         compdef() { :; }
@@ -1342,6 +1466,7 @@ setup() {
     assert_output_not_contains "repo"
     assert_output_not_contains "plain"
     assert_output_not_contains "custom"
+    assert_output_not_contains ".vim"
 }
 
 @test "zsh completion suppresses directory operands after action flags" {

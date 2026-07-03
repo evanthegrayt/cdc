@@ -120,6 +120,20 @@ string will take precedence. There is currently an issue to better handle this
 "feature". Not sure how I want to go about it yet. Suggestions are very much
 welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
 
+### Adding exact directories
+If you have specific directories you want to `cdc` to directly, but you do not
+want their parent directories searched, export `CDC_EXPLICIT_DIRS`. It should be
+a colon-delimited string of full directory paths.
+
+```sh
+export CDC_EXPLICIT_DIRS=$HOME/.vim:$HOME/.config/nvim
+```
+
+These directories are matched by basename, appear in `cdc -l`, and are included
+in tab-completion. Explicit directories take precedence over directories found
+under `CDC_DIRS`, and they are always available even when they are hidden,
+ignored, or not repositories in repo-only mode.
+
 ### Ignoring certain directories
 If you have directories within `CDC_DIRS` that you want the plugin to ignore,
 you can `export CDC_IGNORE` to a string containing those directories. These
@@ -213,9 +227,10 @@ export CDC_ERROR_COLOR='\033[1;91m'    # Bold red.     Default: '\033[0;31m' (re
 ```
 
 ## Usage
-Typing `cdc <TAB>` will list all available directories, and this list is built
-on the fly; nothing is hard-coded. Hit `return` after typing the directory name
-to change to that directory.
+Typing `cdc <TAB>` will list all available directories, including exact
+directories from `CDC_EXPLICIT_DIRS` and directories found on the fly under
+`CDC_DIRS`. Hit `return` after typing the directory name to change to that
+directory.
 
 Typing `cdc -P <TAB>` will list the configured parent directories from
 `CDC_DIRS` by name. For example, if `CDC_DIRS` includes
