@@ -267,8 +267,10 @@ cdc() {
     ##
     # Check for the required variables that should be exported from a shell
     # config file. If not found, exit with a non-zero return code.
-    if [[ -z $CDC_DIRS ]]; then
-        _cdc_print 'error' 'You must set CDC_DIRS in a config file' $verbose
+    if [[ -z $CDC_DIRS && -z $CDC_EXPLICIT_DIRS ]]; then
+        _cdc_print 'error' \
+            'You must set CDC_DIRS or CDC_EXPLICIT_DIRS in a config file' \
+            $verbose
         return 1
     fi
 
@@ -581,11 +583,15 @@ _cdc_print_verbose_env() {
 
     echo "========================= ENV ==========================="
     while IFS= read -r cdc_dir; do
-        printf "CDC_DIRS         += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
+        printf "CDC_DIRS          += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
             "$cdc_dir"
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
+    while IFS= read -r cdc_dir; do
+        printf "CDC_EXPLICIT_DIRS += ${CDC_SUCCESS_COLOR}%s$CDC_RESET\n"\
+            "$cdc_dir"
+    done < <(_cdc_parse_colon_string "$CDC_EXPLICIT_DIRS")
     while IFS= read -r cdc_ignore; do
-        printf "CDC_IGNORE       += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
+        printf "CDC_IGNORE        += ${CDC_ERROR_COLOR}%s$CDC_RESET\n"\
             "$cdc_ignore"
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
     echo
@@ -946,6 +952,8 @@ _cdc_find_dir() {
     local dir
     local dir_path
 
+    _cdc_find_explicit_dir "$cd_dir" "$verbose" && return 0
+
     ##
     # Loop through every path in the colon-delimited CDC_DIRS value.
     while IFS= read -r dir; do
@@ -1004,6 +1012,43 @@ _cdc_find_dir() {
         echo "$dir_path/$cd_dir"
         return 0
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
+
+    return 2
+}
+
+##
+# Find a configured explicit directory by its basename.
+#
+# @param string $cd_dir
+# @param boolean $verbose
+# @return string
+_cdc_find_explicit_dir() {
+    local cd_dir="$1"
+    local verbose="$2"
+    local dir
+    local dir_path
+    local explicit_dir
+
+    while IFS= read -r dir; do
+        [[ -n $dir ]] || continue
+
+        if ! [[ -d $dir ]]; then
+            if [[ $verbose == true ]]; then
+                _cdc_print 'warn' \
+                    "$dir is in CDC_EXPLICIT_DIRS but isn't a directory." \
+                    $verbose
+            fi
+            continue
+        fi
+
+        dir_path=$(_cdc_normalize_dir_path "$dir")
+        explicit_dir=${dir_path##*/}
+
+        if [[ $explicit_dir == "$cd_dir" ]]; then
+            echo "$dir_path"
+            return 0
+        fi
+    done < <(_cdc_parse_colon_string "$CDC_EXPLICIT_DIRS")
 
     return 2
 }
@@ -1202,6 +1247,22 @@ _cdc_repo_list() {
     local directories=()
     local verbose=${1:-false}
     local allow_hidden="${2:-${CDC_ALLOW_HIDDEN:-false}}"
+
+    while IFS= read -r dir; do
+        [[ -n $dir ]] || continue
+
+        if ! [[ -d $dir ]]; then
+            if [[ $verbose == true ]]; then
+                _cdc_print 'warn' \
+                    "$dir is in CDC_EXPLICIT_DIRS but isn't a directory." \
+                    $verbose
+            fi
+            continue
+        fi
+
+        dir=$(_cdc_normalize_dir_path "$dir")
+        directories+=("${dir##*/}")
+    done < <(_cdc_parse_colon_string "$CDC_EXPLICIT_DIRS")
 
     ##
     # Loop through every path in the colon-delimited CDC_DIRS value.

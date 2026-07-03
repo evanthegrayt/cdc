@@ -17,6 +17,8 @@ setup_cdc_fixture() {
     mkdir -p "$CDC_FIXTURE/one/MixedCase/bin"
     mkdir -p "$CDC_FIXTURE/one/repo with space/.git"
     mkdir -p "$CDC_FIXTURE/one/repo with space/bin"
+    mkdir -p "$CDC_HOME/.vim/pack"
+    mkdir -p "$CDC_HOME/plain/subdir"
     mkdir -p "$CDC_FIXTURE/two/repo/.git"
     mkdir -p "$CDC_FIXTURE/two/ignored"
     mkdir -p "$CDC_FIXTURE/two/ignored with space"
@@ -32,6 +34,7 @@ setup_cdc_fixture() {
     unset CDC_REPO_MARKERS
     unset CDC_AUTO_PUSH
     unset CDC_IGNORE_DUPS
+    unset CDC_EXPLICIT_DIRS
     unset CDC_COLOR
     unset CDC_ALLOW_HIDDEN
     unset CDC_CURRENT

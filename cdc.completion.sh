@@ -259,6 +259,22 @@ _cdc_completion_repo_list() {
 }
 
 ##
+# List explicit cdc directories for completion.
+#
+# @return string
+_cdc_completion_explicit_list() {
+    local dir
+    local dir_path
+
+    while IFS= read -r dir; do
+        [[ -d $dir ]] || continue
+        dir_path=$(_cdc_normalize_dir_path "$dir")
+
+        echo "${dir_path##*/}"
+    done < <(_cdc_parse_colon_string "$CDC_EXPLICIT_DIRS")
+}
+
+##
 # List configured parent directories for completion.
 #
 # @param boolean $allow_ignored
@@ -544,9 +560,11 @@ _cdc_completion_list() {
                 | _cdc_completion_select_match "$cd_dir") || return 0
             wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" false)
         else
-            cd_dir=$(_cdc_completion_repo_list \
-                "$allow_ignored" "$repos_only" "$allow_hidden" \
-                | _cdc_completion_select_match "$cd_dir") || return 0
+            cd_dir=$({
+                _cdc_completion_explicit_list
+                _cdc_completion_repo_list \
+                    "$allow_ignored" "$repos_only" "$allow_hidden"
+            } | _cdc_completion_select_match "$cd_dir") || return 0
             wdir=$(_cdc_find_dir \
                 "$cd_dir" "$allow_ignored" "$repos_only" false "$allow_hidden")
         fi
@@ -567,7 +585,10 @@ _cdc_completion_list() {
     fi
 
     ##
-    # Default completion lists child directories under CDC_DIRS.
-    _cdc_completion_repo_list "$allow_ignored" "$repos_only" "$allow_hidden" \
-        | _cdc_completion_filter "$current"
+    # Default completion lists explicit targets first, then child directories
+    # under CDC_DIRS.
+    {
+        _cdc_completion_explicit_list
+        _cdc_completion_repo_list "$allow_ignored" "$repos_only" "$allow_hidden"
+    } | _cdc_completion_filter "$current"
 }
