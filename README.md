@@ -214,6 +214,11 @@ without pushing. When `CDC_REPOS_ONLY` is `true`, `cdc .` pushes the nearest
 parent repository if one is found; otherwise, it pushes the current directory.
 Directories pushed this way are not added to tab-completion.
 
+You can combine `-w` with selected history actions to print full paths without
+changing directories. `cdc -wn` prints the current history entry, `cdc -wp`
+prints the directory `cdc -p` would change to without popping the stack, and
+`cdc -wd` lists all history entries as full paths without verbose debug output.
+
 ### Colored Output
 You can enable/disable colored terminal output, and even change the colors, by
 adding the following lines to a shell config file.
@@ -307,7 +312,7 @@ to delete matching entries from the history stack.
 |-r|Only `cd` to repositories.|
 |-R|`cd` to the directory even if it's not a repository.|
 |-v|Verbose mode. Enables warnings for when things aren't working as expected.|
-|-w|Print the directory location instead of changing to it. Like `which`.|
+|-w|Print the resolved path instead of changing directories. Like `which`.|
 |-h|Print help.|
 
 ## Tests

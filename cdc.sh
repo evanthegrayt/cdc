@@ -29,6 +29,7 @@ cdc() {
     local print_help=false
     local terminal_action_count=0
     local has_directory_modifier=false
+    local directory_modifier_count=0
     local allow_hidden=${CDC_ALLOW_HIDDEN:-false}
     local pushdir_option_set=false
     local use_color=${CDC_COLOR:-true}
@@ -60,6 +61,7 @@ cdc() {
             a)
                 allow_ignored=true
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -75,6 +77,7 @@ cdc() {
             H)
                 allow_hidden=true
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -89,6 +92,7 @@ cdc() {
             N)
                 update_current=false
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -152,6 +156,7 @@ cdc() {
             P)
                 cdc_parent_dirs=true
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -159,6 +164,7 @@ cdc() {
             r)
                 repos_only=true
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -166,6 +172,7 @@ cdc() {
             R)
                 repos_only=false
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -174,6 +181,7 @@ cdc() {
                 pushdir=true
                 pushdir_option_set=true
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -182,6 +190,7 @@ cdc() {
                 pushdir=false
                 pushdir_option_set=true
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -194,6 +203,7 @@ cdc() {
             w)
                 which=true
                 has_directory_modifier=true
+                (( directory_modifier_count += 1 ))
                 ;;
 
             ##
@@ -240,8 +250,25 @@ cdc() {
     fi
 
     if (( terminal_action_count == 1 )) && [[ $has_directory_modifier == true ]]; then
-        _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
-        return 1
+        if [[ $which == true ]] \
+            && (( directory_modifier_count == 1 )) \
+            && [[ $cdc_show_history == true \
+                || $cdc_current == true \
+                || $cdc_pop == true ]]; then
+            :
+        else
+            _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
+            return 1
+        fi
+    fi
+
+    if (( terminal_action_count == 1 )) && [[ $which == true ]]; then
+        if [[ $cdc_show_history != true \
+            && $cdc_current != true \
+            && $cdc_pop != true ]]; then
+            _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
+            return 1
+        fi
     fi
 
     if [[ $cdc_delete_history == true ]]; then
@@ -295,17 +322,17 @@ cdc() {
     fi
 
     if [[ $cdc_show_history == true ]]; then
-        _cdc_history_list "$verbose" || (( rc += 1 ))
+        _cdc_history_list "$verbose" "$which" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_current == true ]]; then
-        _cdc_history_current "$verbose" || (( rc += 1 ))
+        _cdc_history_current "$verbose" "$which" || (( rc += 1 ))
         should_return=true
     fi
 
     if [[ $cdc_pop == true ]]; then
-        _cdc_history_pop "$verbose" || (( rc += 1 ))
+        _cdc_history_pop "$verbose" "$which" || (( rc += 1 ))
         should_return=true
     fi
 
@@ -800,9 +827,11 @@ _cdc_history_toggle() {
 # List cdc history.
 #
 # @param boolean $verbose
+# @param boolean $which
 # @return boolean
 _cdc_history_list() {
     local verbose="$1"
+    local which="${2:-false}"
     local cdc_history
 
     ##
@@ -819,7 +848,7 @@ _cdc_history_list() {
     ##
     # Print the array.
     for cdc_history in "${CDC_HISTORY[@]}"; do
-        if [[ $verbose == true ]]; then
+        if [[ $verbose == true || $which == true ]]; then
             printf "%s " "$cdc_history"
         else
             printf "%s " "${cdc_history##*/}"
@@ -832,9 +861,11 @@ _cdc_history_list() {
 # Change to the current directory in history.
 #
 # @param boolean $verbose
+# @param boolean $which
 # @return boolean
 _cdc_history_current() {
     local verbose="$1"
+    local which="${2:-false}"
     local cdc_last_index
 
     ##
@@ -851,6 +882,11 @@ _cdc_history_current() {
     ##
     # cd to the root of the last repository in the history.
     cdc_last_index=$(_cdc_array_last_index "${#CDC_HISTORY[@]}")
+    if [[ $which == true ]]; then
+        printf "%s\n" "${CDC_HISTORY[$cdc_last_index]}"
+        return 0
+    fi
+
     cd "${CDC_HISTORY[$cdc_last_index]}" || return 1
     _cdc_set_current "${CDC_HISTORY[$cdc_last_index]}"
     return 0
@@ -860,9 +896,11 @@ _cdc_history_current() {
 # Change to the previous directory in history.
 #
 # @param boolean $verbose
+# @param boolean $which
 # @return boolean
 _cdc_history_pop() {
     local verbose="$1"
+    local which="${2:-false}"
     local cdc_last_index
 
     ##
@@ -877,6 +915,12 @@ _cdc_history_pop() {
 
     if [[ $verbose == true ]]; then
         _cdc_print 'success' 'Changing to last directory in history.' $verbose
+    fi
+
+    cdc_last_index=$(_cdc_array_next_to_last_index "${#CDC_HISTORY[@]}")
+    if [[ $which == true ]]; then
+        printf "%s\n" "${CDC_HISTORY[$cdc_last_index]}"
+        return 0
     fi
 
     ##
