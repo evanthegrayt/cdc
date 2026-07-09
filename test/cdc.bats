@@ -448,6 +448,22 @@ setup() {
     [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
+@test "history pop which mode previews the previous history path without popping" {
+    cdc repo
+    cdc plain
+    cd "$CDC_FIXTURE/start"
+
+    cdc -wp >"$BATS_TEST_TMPDIR/history-pop-which.out"
+
+    assert_file_equals "$BATS_TEST_TMPDIR/history-pop-which.out" \
+        "$CDC_FIXTURE/one/repo"
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/two/plain" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/two/plain" ]
+}
+
 @test "history toggle flips between the last two directories" {
     cdc repo
     cdc plain
@@ -471,6 +487,22 @@ setup() {
     [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
+@test "history current which mode prints the current history path without changing state" {
+    cdc repo
+    cdc plain
+    cd "$CDC_FIXTURE/start"
+
+    cdc -wn >"$BATS_TEST_TMPDIR/history-current-which.out"
+
+    assert_file_equals "$BATS_TEST_TMPDIR/history-current-which.out" \
+        "$CDC_FIXTURE/two/plain"
+    [ "$PWD" = "$CDC_FIXTURE/start" ]
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/two/plain" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/two/plain" ]
+}
+
 @test "history list prints repository base names" {
     cdc repo
     cdc "repo with space"
@@ -479,6 +511,17 @@ setup() {
 
     assert_success
     [ "$output" = "repo repo with space " ]
+}
+
+@test "history list which mode prints full paths without verbose output" {
+    cdc repo
+    cdc "repo with space"
+
+    run cdc -wd
+
+    assert_success
+    [ "$output" = "$CDC_FIXTURE/one/repo $CDC_FIXTURE/one/repo with space " ]
+    assert_output_not_contains "Listing directories in history."
 }
 
 @test "history list prints full paths in verbose mode" {
@@ -648,6 +691,10 @@ setup() {
     run cdc -lw
     assert_failure_status 1
     assert_output_contains "Standalone options cannot be combined with directory options."
+
+    run cdc -wx repo
+    assert_failure_status 1
+    assert_output_contains "Standalone options cannot be combined with directory options."
 }
 
 @test "cdc -i works with errexit enabled" {
@@ -732,7 +779,7 @@ setup() {
 
 @test "cdc does not leak internal variables" {
     unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only verbose
-    unset update_current
+    unset update_current directory_modifier_count
     unset success_color warning_color error_color reset_color
     unset allow_hidden cdc_delete_history cdc_clear_history
     unset terminal_action_count has_directory_modifier CDC_RESET
@@ -751,6 +798,7 @@ setup() {
     [ -z "${repos_only+x}" ]
     [ -z "${verbose+x}" ]
     [ -z "${update_current+x}" ]
+    [ -z "${directory_modifier_count+x}" ]
     [ -z "${success_color+x}" ]
     [ -z "${warning_color+x}" ]
     [ -z "${error_color+x}" ]
