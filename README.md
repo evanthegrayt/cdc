@@ -261,6 +261,20 @@ In the example above, `CDC_CURRENT` points to the root of `my-project`, not the
 `bin` subdirectory. Using `-w` only prints a directory path and does not update
 `CDC_CURRENT`.
 
+Use `-N` when you want to temporarily `cdc` somewhere without replacing that
+stored root. For example:
+
+```sh
+cdc rubyproject1
+cdc -UN rubyproject2
+cp Rakefile "$CDC_CURRENT"/
+cdc -n
+```
+
+In this example, `-U` keeps `rubyproject2` off the history stack, `-N` keeps
+`CDC_CURRENT` pointed at `rubyproject1`, and `cdc -n` returns to the current
+history entry.
+
 ### Options
 The plugin comes with a few available options. Some are for dealing with the
 directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
@@ -282,6 +296,7 @@ to delete matching entries from the history stack.
 |-i|List the directories that are to be ignored.|
 |-d|List directories in history stack. Similar to the `dirs` command.|
 |-n|`cd` to the current directory in the history stack.|
+|-N|Do not update `CDC_CURRENT`.|
 |-t|Toggle to the last directory, similar to `cd -`. Rearranges history stack.|
 |-p|`cd` to previous directory in history stack. Similar to the `popd` command.|
 |-P|`cd` to a configured parent directory from `CDC_DIRS`.|

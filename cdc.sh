@@ -18,6 +18,7 @@ cdc() {
     local should_return=false
     local allow_ignored=false
     local which=false
+    local update_current=true
     local cdc_current=false
     local cdc_pop=false
     local cdc_show_history=false
@@ -51,7 +52,7 @@ cdc() {
     ##
     # Parse short options. getopts errors are suppressed so unsupported flags
     # can use cdc's own error text instead of shell-generated messages.
-    while getopts 'acCdDhiHlLnPprRtuUvwxX' opt 2>/dev/null; do
+    while getopts 'acCdDhiHlLnNPprRtuUvwxX' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -81,6 +82,13 @@ cdc() {
             n)
                 cdc_current=true
                 (( terminal_action_count += 1 ))
+                ;;
+
+            ##
+            # -N: Do not update CDC_CURRENT.
+            N)
+                update_current=false
+                has_directory_modifier=true
                 ;;
 
             ##
@@ -339,7 +347,7 @@ cdc() {
             printf "%s\n" "$wdir"
         elif [[ $pushdir == true || $pushdir_option_set == false ]]; then
             _cdc_history_push "$wdir"
-            _cdc_set_current "$wdir"
+            [[ $update_current == true ]] && _cdc_set_current "$wdir"
         fi
 
         return 0
@@ -378,7 +386,7 @@ cdc() {
             printf "%s\n" "$wdir"
         else
             cd "$wdir" || return 1
-            _cdc_set_current "$cdc_current_root"
+            [[ $update_current == true ]] && _cdc_set_current "$cdc_current_root"
         fi
 
         ##
@@ -632,6 +640,7 @@ _cdc_option_specs() {
     printf "%s\t%s\t%s\n" 'i' 'terminal' 'List ignored directories'
     printf "%s\t%s\t%s\n" 'd' 'terminal' 'List the directories in the stack'
     printf "%s\t%s\t%s\n" 'n' 'terminal' 'cd to the current directory in the stack'
+    printf "%s\t%s\t%s\n" 'N' 'directory' 'Do not update CDC_CURRENT'
     printf "%s\t%s\t%s\n" 'p' 'terminal' 'cd to the previous directory and pop it from the stack'
     printf "%s\t%s\t%s\n" 'P' 'directory' 'cd to a configured parent directory'
     printf "%s\t%s\t%s\n" 't' 'terminal' 'Toggle between the last two directories in the stack'

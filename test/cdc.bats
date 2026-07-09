@@ -173,6 +173,41 @@ setup() {
     [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
 }
 
+@test "cdc -UN changes directories without pushing history or updating current" {
+    cdc repo
+    cdc -UN plain
+
+    [ "$PWD" = "$CDC_FIXTURE/two/plain" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
+
+    cdc -n
+
+    [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
+}
+
+@test "cdc -N still pushes history without updating current" {
+    cdc repo
+    cdc -N plain
+
+    [ "$PWD" = "$CDC_FIXTURE/two/plain" ]
+    [ "${#CDC_HISTORY[@]}" -eq 2 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ "${CDC_HISTORY[1]}" = "$CDC_FIXTURE/two/plain" ]
+    [ "$CDC_CURRENT" = "$CDC_FIXTURE/one/repo" ]
+}
+
+@test "cdc -N leaves CDC_CURRENT unset when it was unset" {
+    cdc -N repo
+
+    [ "$PWD" = "$CDC_FIXTURE/one/repo" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    [ -z "${CDC_CURRENT+x}" ]
+}
+
 @test "cdc . pushes the current directory without changing directories" {
     cdc .
 
@@ -697,6 +732,7 @@ setup() {
 
 @test "cdc does not leak internal variables" {
     unset opt wdir cd_dir subdir use_color pushdir pushdir_option_set repos_only verbose
+    unset update_current
     unset success_color warning_color error_color reset_color
     unset allow_hidden cdc_delete_history cdc_clear_history
     unset terminal_action_count has_directory_modifier CDC_RESET
@@ -714,6 +750,7 @@ setup() {
     [ -z "${pushdir_option_set+x}" ]
     [ -z "${repos_only+x}" ]
     [ -z "${verbose+x}" ]
+    [ -z "${update_current+x}" ]
     [ -z "${success_color+x}" ]
     [ -z "${warning_color+x}" ]
     [ -z "${error_color+x}" ]
