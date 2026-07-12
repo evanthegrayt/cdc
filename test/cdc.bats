@@ -679,6 +679,131 @@ setup() {
     assert_output_contains "custom"
 }
 
+@test "cdc -G reports repos with unstaged staged and untracked changes" {
+    AUDIT_ROOT="$BATS_TEST_TMPDIR/git audit"
+    export CDC_DIRS="$AUDIT_ROOT"
+    export CDC_IGNORE=
+    git_fixture_repo "$AUDIT_ROOT/dirty"
+
+    printf "changed\n" >> "$AUDIT_ROOT/dirty/README.md"
+    printf "staged\n" > "$AUDIT_ROOT/dirty/staged.txt"
+    git -C "$AUDIT_ROOT/dirty" add staged.txt
+    printf "untracked\n" > "$AUDIT_ROOT/dirty/untracked.txt"
+
+    run cdc -G
+
+    assert_success
+    assert_output_contains "dirty"
+    assert_output_contains "staged=1"
+    assert_output_contains "unstaged=1"
+    assert_output_contains "untracked=1"
+    assert_output_contains "$AUDIT_ROOT/dirty"
+}
+
+@test "cdc -G reports repos with commits ahead of upstream" {
+    AUDIT_ROOT="$BATS_TEST_TMPDIR/git audit"
+    REMOTE="$BATS_TEST_TMPDIR/remote.git"
+    export CDC_DIRS="$AUDIT_ROOT"
+    export CDC_IGNORE=
+    git_fixture_repo "$AUDIT_ROOT/ahead"
+    git init --bare -q "$REMOTE"
+    git -C "$AUDIT_ROOT/ahead" remote add origin "$REMOTE"
+    git -C "$AUDIT_ROOT/ahead" push -q -u origin HEAD
+
+    printf "ahead\n" >> "$AUDIT_ROOT/ahead/README.md"
+    git_fixture_commit "$AUDIT_ROOT/ahead" README.md "ahead"
+
+    run cdc -G
+
+    assert_success
+    assert_output_contains "ahead"
+    assert_output_contains "ahead=1"
+    assert_output_contains "$AUDIT_ROOT/ahead"
+}
+
+@test "cdc -G skips clean repos and non-Git directories" {
+    AUDIT_ROOT="$BATS_TEST_TMPDIR/git audit"
+    export CDC_DIRS="$AUDIT_ROOT"
+    export CDC_IGNORE=
+    git_fixture_repo "$AUDIT_ROOT/clean"
+    mkdir -p "$AUDIT_ROOT/plain"
+
+    run cdc -G
+
+    assert_success
+    [ "$output" = "" ]
+
+    run cdc -r -G
+
+    assert_success
+    [ "$output" = "" ]
+
+    run cdc -R -G
+
+    assert_success
+    [ "$output" = "" ]
+}
+
+@test "cdc -G skips child directories inside a larger worktree" {
+    OUTER="$BATS_TEST_TMPDIR/outer"
+    export CDC_DIRS="$OUTER/plugins"
+    export CDC_IGNORE=
+    git_fixture_repo "$OUTER"
+    mkdir -p "$OUTER/plugins/example"
+    printf "plugin\n" > "$OUTER/plugins/example/plugin.zsh"
+    git_fixture_commit "$OUTER" plugins/example/plugin.zsh "add plugin"
+    git_fixture_repo "$OUTER/plugins/nested"
+    printf "changed\n" >> "$OUTER/plugins/example/plugin.zsh"
+    printf "changed\n" >> "$OUTER/plugins/nested/README.md"
+
+    run cdc -G
+
+    assert_success
+    assert_output_contains "nested"
+    assert_output_contains "unstaged=1"
+    assert_output_not_contains "example"
+}
+
+@test "cdc -G respects CDC_IGNORE unless -a is passed" {
+    AUDIT_ROOT="$BATS_TEST_TMPDIR/git audit"
+    export CDC_DIRS="$AUDIT_ROOT"
+    export CDC_IGNORE=ignored
+    git_fixture_repo "$AUDIT_ROOT/ignored"
+    git_fixture_repo "$AUDIT_ROOT/visible"
+    printf "ignored\n" >> "$AUDIT_ROOT/ignored/README.md"
+    printf "visible\n" >> "$AUDIT_ROOT/visible/README.md"
+
+    run cdc -G
+
+    assert_success
+    assert_output_contains "visible"
+    assert_output_not_contains "ignored"
+
+    run cdc -a -G
+
+    assert_success
+    assert_output_contains "visible"
+    assert_output_contains "ignored"
+}
+
+@test "cdc -G does not change PWD or push history" {
+    AUDIT_ROOT="$BATS_TEST_TMPDIR/git audit"
+    export CDC_DIRS="$AUDIT_ROOT"
+    export CDC_IGNORE=
+    git_fixture_repo "$AUDIT_ROOT/dirty"
+    printf "changed\n" >> "$AUDIT_ROOT/dirty/README.md"
+    start_pwd="$PWD"
+    CDC_HISTORY=("$CDC_FIXTURE/one/repo")
+
+    cdc -G > "$BATS_TEST_TMPDIR/git-audit.out"
+
+    [ "$PWD" = "$start_pwd" ]
+    [ "${#CDC_HISTORY[@]}" -eq 1 ]
+    [ "${CDC_HISTORY[0]}" = "$CDC_FIXTURE/one/repo" ]
+    assert_file_equals "$BATS_TEST_TMPDIR/git-audit.out" \
+        "dirty                    unstaged=1                               $AUDIT_ROOT/dirty"
+}
+
 @test "standalone options reject directories and other action flags" {
     run cdc -l repo
     assert_failure_status 1
@@ -720,6 +845,8 @@ setup() {
     assert_output_contains "cd to a configured parent directory"
     assert_output_contains "-R"
     assert_output_contains "cd to any directory, even if it is not a repository"
+    assert_output_contains "-G"
+    assert_output_contains "Audit git repositories for local work or unpushed commits"
     assert_output_contains "-H"
     assert_output_contains "Include hidden directories in lookup, listing, and completion"
     assert_output_contains "-x"
@@ -783,6 +910,7 @@ setup() {
     unset success_color warning_color error_color reset_color
     unset allow_hidden cdc_delete_history cdc_clear_history
     unset terminal_action_count has_directory_modifier CDC_RESET
+    unset cdc_git_audit cdc_git_audit_disallowed_modifier
     unset CDC_SUCCESS_COLOR CDC_WARNING_COLOR CDC_ERROR_COLOR cdc_ignore
 
     cdc -w repo >/dev/null
@@ -808,6 +936,8 @@ setup() {
     [ -z "${cdc_clear_history+x}" ]
     [ -z "${terminal_action_count+x}" ]
     [ -z "${has_directory_modifier+x}" ]
+    [ -z "${cdc_git_audit+x}" ]
+    [ -z "${cdc_git_audit_disallowed_modifier+x}" ]
     [ -z "${CDC_RESET+x}" ]
     [ -z "${CDC_SUCCESS_COLOR+x}" ]
     [ -z "${CDC_WARNING_COLOR+x}" ]
@@ -1171,6 +1301,7 @@ setup() {
     '
 
     assert_success
+    assert_output_contains "-G"
     assert_output_contains "-v"
     assert_output_not_contains "-D"
 }
@@ -1680,6 +1811,7 @@ setup() {
     '
 
     assert_success
+    assert_output_contains "-G  Audit git repositories for local work or unpushed commits"
     assert_output_contains "-H  Include hidden directories in lookup, listing, and completion"
     assert_output_contains "-P  cd to a configured parent directory"
     assert_output_contains "-R  cd to any directory, even if it is not a repository"

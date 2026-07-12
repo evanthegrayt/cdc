@@ -25,6 +25,8 @@ cdc() {
     local cdc_delete_history=false
     local cdc_clear_history=false
     local cdc_list_ignored=false
+    local cdc_git_audit=false
+    local cdc_git_audit_disallowed_modifier=false
     local cdc_parent_dirs=false
     local print_help=false
     local terminal_action_count=0
@@ -53,7 +55,7 @@ cdc() {
     ##
     # Parse short options. getopts errors are suppressed so unsupported flags
     # can use cdc's own error text instead of shell-generated messages.
-    while getopts 'acCdDhiHlLnNPprRtuUvwxX' opt 2>/dev/null; do
+    while getopts 'acCdDGhiHlLnNPprRtuUvwxX' opt 2>/dev/null; do
         case $opt in
 
             ##
@@ -77,7 +79,15 @@ cdc() {
             H)
                 allow_hidden=true
                 has_directory_modifier=true
+                cdc_git_audit_disallowed_modifier=true
                 (( directory_modifier_count += 1 ))
+                ;;
+
+            ##
+            # -G: Audit known git worktrees for local work and ahead commits.
+            G)
+                cdc_git_audit=true
+                (( terminal_action_count += 1 ))
                 ;;
 
             ##
@@ -92,6 +102,7 @@ cdc() {
             N)
                 update_current=false
                 has_directory_modifier=true
+                cdc_git_audit_disallowed_modifier=true
                 (( directory_modifier_count += 1 ))
                 ;;
 
@@ -156,6 +167,7 @@ cdc() {
             P)
                 cdc_parent_dirs=true
                 has_directory_modifier=true
+                cdc_git_audit_disallowed_modifier=true
                 (( directory_modifier_count += 1 ))
                 ;;
 
@@ -181,6 +193,7 @@ cdc() {
                 pushdir=true
                 pushdir_option_set=true
                 has_directory_modifier=true
+                cdc_git_audit_disallowed_modifier=true
                 (( directory_modifier_count += 1 ))
                 ;;
 
@@ -190,6 +203,7 @@ cdc() {
                 pushdir=false
                 pushdir_option_set=true
                 has_directory_modifier=true
+                cdc_git_audit_disallowed_modifier=true
                 (( directory_modifier_count += 1 ))
                 ;;
 
@@ -203,6 +217,7 @@ cdc() {
             w)
                 which=true
                 has_directory_modifier=true
+                cdc_git_audit_disallowed_modifier=true
                 (( directory_modifier_count += 1 ))
                 ;;
 
@@ -249,7 +264,9 @@ cdc() {
         return 1
     fi
 
-    if (( terminal_action_count == 1 )) && [[ $has_directory_modifier == true ]]; then
+    if (( terminal_action_count == 1 )) \
+        && [[ $has_directory_modifier == true ]] \
+        && [[ $cdc_git_audit == false ]]; then
         if [[ $which == true ]] \
             && (( directory_modifier_count == 1 )) \
             && [[ $cdc_show_history == true \
@@ -260,6 +277,14 @@ cdc() {
             _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
             return 1
         fi
+    fi
+
+    if (( terminal_action_count == 1 )) \
+        && [[ $has_directory_modifier == true ]] \
+        && [[ $cdc_git_audit == true ]] \
+        && [[ $cdc_git_audit_disallowed_modifier == true ]]; then
+        _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
+        return 1
     fi
 
     if (( terminal_action_count == 1 )) && [[ $which == true ]]; then
@@ -291,7 +316,12 @@ cdc() {
     ##
     # Check for the required variables that should be exported from a shell
     # config file. If not found, exit with a non-zero return code.
-    if [[ -z $CDC_DIRS && -z $CDC_EXPLICIT_DIRS ]]; then
+    if [[ $cdc_git_audit == true && -z $CDC_DIRS ]]; then
+        _cdc_print 'error' \
+            'You must set CDC_DIRS in a config file' \
+            $verbose
+        return 1
+    elif [[ -z $CDC_DIRS && -z $CDC_EXPLICIT_DIRS ]]; then
         _cdc_print 'error' \
             'You must set CDC_DIRS or CDC_EXPLICIT_DIRS in a config file' \
             $verbose
@@ -308,6 +338,12 @@ cdc() {
 
     if [[ $cdc_list_dirs == true ]]; then
         _cdc_list_available_dirs "$verbose" "$allow_hidden"
+        should_return=true
+    fi
+
+    if [[ $cdc_git_audit == true ]]; then
+        _cdc_git_audit "$verbose" "$allow_ignored" "$allow_hidden" \
+            || (( rc += 1 ))
         should_return=true
     fi
 
@@ -661,6 +697,7 @@ _cdc_option_specs() {
     printf "%s\t%s\t%s\n" 'a' 'directory' 'cd to the directory even if it is ignored'
     printf "%s\t%s\t%s\n" 'c' 'directory' 'Enable colored output'
     printf "%s\t%s\t%s\n" 'C' 'directory' 'Disable colored output'
+    printf "%s\t%s\t%s\n" 'G' 'terminal' 'Audit git repositories for local work or unpushed commits'
     printf "%s\t%s\t%s\n" 'H' 'directory' 'Include hidden directories in lookup, listing, and completion'
     printf "%s\t%s\t%s\n" 'l' 'terminal' 'List cdc-able directories'
     printf "%s\t%s\t%s\n" 'L' 'terminal' 'List directories that cdc searches'
@@ -749,6 +786,187 @@ _cdc_list_available_dirs() {
     _cdc_repo_list "$verbose" "$allow_hidden" | while IFS= read -r list; do
         printf "%-8s\n" "$list"
     done | column
+}
+
+##
+# Audit first-level CDC_DIRS children that are real Git worktrees.
+#
+# @param boolean $verbose
+# @param boolean $allow_ignored
+# @param boolean $allow_hidden
+# @return boolean
+_cdc_git_audit() {
+    local verbose="$1"
+    local allow_ignored="${2:-false}"
+    local allow_hidden="${3:-${CDC_ALLOW_HIDDEN:-false}}"
+    local parent_dir
+    local dir
+    local summary
+    local summary_rc
+    local rc=0
+
+    if ! command -v git >/dev/null 2>&1; then
+        _cdc_print 'error' 'git is required for cdc -G' "$verbose"
+        return 1
+    fi
+
+    while IFS= read -r parent_dir; do
+        [[ -n $parent_dir ]] || continue
+
+        if ! [[ -d $parent_dir ]]; then
+            if [[ $verbose == true ]]; then
+                _cdc_print 'warn' \
+                    "$parent_dir is in CDC_DIRS but isn't a directory." \
+                    "$verbose"
+            fi
+            continue
+        fi
+
+        while IFS= read -r dir; do
+            dir=${dir%/}
+
+            if [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$dir"; then
+                continue
+            fi
+
+            if ! _cdc_git_audit_is_worktree_root "$dir"; then
+                continue
+            fi
+
+            summary=$(_cdc_git_audit_summary "$dir" "$verbose")
+            summary_rc=$?
+
+            if (( summary_rc == 0 )); then
+                printf "%-24s %-40s %s\n" "${dir##*/}" "$summary" "$dir"
+            elif (( summary_rc > 1 )); then
+                rc=1
+            fi
+        done < <(_cdc_child_dirs "$parent_dir" "$allow_hidden")
+    done < <(_cdc_parse_colon_string "$CDC_DIRS")
+
+    return $rc
+}
+
+##
+# Is the candidate directory itself a Git worktree root?
+#
+# @param string $dir
+# @return boolean
+_cdc_git_audit_is_worktree_root() {
+    local dir="$1"
+    local prefix
+
+    if ! prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null); then
+        return 1
+    fi
+
+    [[ -z $prefix ]]
+}
+
+##
+# Print the compact attention summary for one Git worktree.
+#
+# Returns:
+#   0 when the repo needs attention and a summary was printed
+#   1 when the repo is clean and not ahead of upstream
+#   2 when Git failed unexpectedly
+#
+# @param string $dir
+# @param boolean $verbose
+# @return boolean
+_cdc_git_audit_summary() {
+    local dir="$1"
+    local verbose="${2:-false}"
+    local status_output
+    local ahead
+    local staged=0
+    local unstaged=0
+    local untracked=0
+    local -a summary=()
+
+    if ! status_output=$(git -C "$dir" -c core.optionalLocks=false \
+        status --porcelain=v1 2>/dev/null); then
+        _cdc_print 'error' "Unable to read git status for $dir" "$verbose"
+        return 2
+    fi
+
+    read -r staged unstaged untracked \
+        < <(_cdc_git_audit_status_counts "$status_output")
+
+    ahead=$(_cdc_git_audit_ahead_count "$dir" "$verbose") || return 2
+
+    (( staged > 0 )) && summary+=("staged=$staged")
+    (( unstaged > 0 )) && summary+=("unstaged=$unstaged")
+    (( untracked > 0 )) && summary+=("untracked=$untracked")
+    (( ahead > 0 )) && summary+=("ahead=$ahead")
+
+    (( ${#summary[@]} > 0 )) || return 1
+
+    printf "%s\n" "${summary[*]}"
+}
+
+##
+# Count staged, unstaged, and untracked files from porcelain v1 status.
+#
+# @param string $status_output
+# @return string
+_cdc_git_audit_status_counts() {
+    local status_output="$1"
+    local line
+    local index_status
+    local worktree_status
+    local staged_count=0
+    local unstaged_count=0
+    local untracked_count=0
+
+    while IFS= read -r line || [[ -n $line ]]; do
+        [[ -n $line ]] || continue
+
+        index_status="${line%"${line#?}"}"
+        worktree_status="${line#?}"
+        worktree_status="${worktree_status%"${worktree_status#?}"}"
+
+        if [[ $index_status == "?" && $worktree_status == "?" ]]; then
+            (( untracked_count += 1 ))
+            continue
+        fi
+
+        [[ $index_status != " " && $index_status != "?" ]] \
+            && (( staged_count += 1 ))
+        [[ $worktree_status != " " && $worktree_status != "?" ]] \
+            && (( unstaged_count += 1 ))
+    done <<< "$status_output"
+
+    printf "%s %s %s\n" "$staged_count" "$unstaged_count" "$untracked_count"
+}
+
+##
+# Count commits in HEAD that are not in the configured upstream.
+#
+# @param string $dir
+# @param boolean $verbose
+# @return string
+_cdc_git_audit_ahead_count() {
+    local dir="$1"
+    local verbose="${2:-false}"
+    local counts
+    local behind
+    local ahead
+
+    if ! git -C "$dir" rev-parse --abbrev-ref --symbolic-full-name \
+        '@{upstream}' >/dev/null 2>&1; then
+        printf "0\n"
+        return 0
+    fi
+
+    if ! counts=$(git -C "$dir" rev-list --left-right --count \
+        '@{upstream}...HEAD' 2>/dev/null); then
+        _cdc_print 'error' "Unable to read upstream status for $dir" "$verbose"
+        return 2
+    fi
+
+    read -r behind ahead <<< "$counts"
+    printf "%s\n" "${ahead:-0}"
 }
 
 ##

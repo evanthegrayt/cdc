@@ -62,3 +62,24 @@ assert_output_not_contains() {
 assert_file_equals() {
     [ "$(cat "$1")" = "$2" ]
 }
+
+git_fixture_repo() {
+    local dir="$1"
+
+    mkdir -p "$dir"
+    git -C "$dir" init -q
+    git -C "$dir" config user.name "cdc tests"
+    git -C "$dir" config user.email "cdc@example.test"
+    printf "initial\n" > "$dir/README.md"
+    git -C "$dir" add README.md
+    git -C "$dir" commit -qm "initial"
+}
+
+git_fixture_commit() {
+    local dir="$1"
+    local file="$2"
+    local message="$3"
+
+    git -C "$dir" add "$file"
+    git -C "$dir" commit -qm "$message"
+}
