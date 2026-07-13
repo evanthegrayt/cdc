@@ -285,8 +285,9 @@ The plugin comes with a few available options. Some are for dealing with the
 directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
 overriding variables set in a shell config file. There's also a verbose mode.
 Options that change a directory lookup can be combined, such as `-aRw` or
-`-PU`. Standalone action options (`-l`, `-L`, `-i`, `-d`, `-n`, `-t`, `-p`,
-`-X`, and `-h`) should be used one at a time, without a directory argument.
+`-PU`. Standalone action options (`-G`, `-l`, `-L`, `-i`, `-d`, `-n`, `-t`,
+`-p`, `-X`, and `-h`) should be used one at a time, without a directory
+argument.
 The `-x` history action is also standalone, but requires one directory operand
 to delete matching entries from the history stack.
 
@@ -295,6 +296,7 @@ to delete matching entries from the history stack.
 |-a|Allow the plugin to `cd` to ignored directories.|
 |-c|Enable colored output.|
 |-C|Disable colored output.|
+|-G|Audit Git repositories in `CDC_DIRS` for local work or unpushed commits.|
 |-H|Include hidden directories in lookup, listing, and completion.|
 |-l|List all directories to which you can `cdc`. Same as tab-completion.|
 |-L|List the directories in which `cdc` will search.|
