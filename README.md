@@ -1,4 +1,9 @@
 # $ cdc
+[![Shells: zsh | bash](https://img.shields.io/static/v1?label=shells&message=zsh%20%7C%20bash&color=4EAA25&style=flat&logo=shell&logoColor=white)](#compatibility)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Completions: zsh | bash](https://img.shields.io/static/v1?label=completions&message=zsh%20%7C%20bash&color=4EAA25&style=flat&logo=shell&logoColor=white)](#completion)
+[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fevanthegrayt%2Fcdc%2Fbadge%3Fref%3Dmaster&style=flat)](https://actions-badge.atrox.dev/evanthegrayt/cdc/goto?ref=master)
+
 > If your repositories are spread throughout your system like a pandemic, then
 > `cdc` is the solution!
 
@@ -58,6 +63,10 @@ initial `cd`. As time has gone on, this plugin has gained a ton of
 I wanted something fast to type that wasn't already a command or builtin. You
 already type `cd` a million times a day, and you don't even have to move your
 finger to hit the <kbd>c</kbd> key again. You can't get much faster.
+
+## Compatibility
+This plugin is designed to work with both `zsh` and `bash` shell. Code is as
+agnostic as it can be, with conditionals for things like array indices.
 
 ## Installation
 ### Vanilla zsh or bash
