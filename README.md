@@ -114,20 +114,41 @@ file](https://github.com/evanthegrayt/dotfiles/blob/master/dotfiles/shellrc#L30)
 
 ### Telling cdc where to look
 To use this plugin, you need to `export CDC_DIRS` in a shell config file. It
-should be a string with absolute paths to the directories to search, separated by
-colons (similar to `$PATH`).
+should be a string with absolute paths to the directories to search, separated
+by colons (similar to `$PATH`).
 
 ```sh
 # Set this in ~/.zshrc or similar
 export CDC_DIRS=$HOME/dir_with_repos:$HOME/workspace/another_dir_with_repos
 ```
 
-Note that the order of the paths in the string matters. The plugin will `cd`
-to the first match it finds, so if you have the same repository (or two
-repositories with the same name) in two places, the first location in the
-string will take precedence. There is currently an issue to better handle this
-"feature". Not sure how I want to go about it yet. Suggestions are very much
-welcome [on the issue](https://github.com/evanthegrayt/cdc/issues/6).
+### Handling duplicate directory names
+By default, `cdc` uses the first valid match in `CDC_DIRS` order. Set
+`CDC_COLLISION_MODE` to change this behavior.
+
+| Value | Behavior when multiple valid matches exist |
+|:------|:------------------------------------------|
+| `first` (default) | Use the first match; ignore saved choices. |
+| `cache` | Reuse a valid saved choice; otherwise prompt and save the selection. |
+| `prompt` | Ask every time; ignore saved choices and do not save selections. |
+
+```sh
+# Opt into remembered choices in ~/.zshrc or ~/.bashrc:
+export CDC_COLLISION_MODE=cache
+```
+
+To override any mode for one invocation, use `cdc -s [dir]`. When in `cache`
+mode, if you select a non-cached directory, you will be asked if you want to
+update the cache to the newly-selected directory.
+
+Cached choices live in `${XDG_CACHE_HOME:-$HOME/.cache}/cdc/choices`. Set
+`CDC_CHOICES_FILE` to use a different path. Calling `cdc -e` will open this file
+in your editor. Delete a record to reset its preference, or delete the file to
+reset all preferences.
+
+Single matches will always resolve without prompting or saving. Non-interactive
+calls always use the first match and never read or write choices, regardless of
+mode.
 
 ### Adding exact directories
 If you have specific directories you want to `cdc` to directly, but you do not
@@ -172,11 +193,11 @@ You can also enable hidden directories for one command with `-H`, such as
 `cdc -H .config` or `cdc -H .<TAB>`.
 
 ### Only recognize actual repositories
-You can `export CDC_REPOS_ONLY` in a shell config file to make `cdc` only recognize
-repositories as directories. This is **disabled by default**. You can also set
-a string of files and directories that mark what you consider a repository.
-Note that markers that are directories must end with a `/`, while files must
-not.
+You can `export CDC_REPOS_ONLY` in a shell config file to make `cdc` only
+recognize repositories as directories. This is **disabled by default**. You can
+also set a string of files and directories that mark what you consider a
+repository.  Note that markers that are directories must end with a `/`, while
+files must not.
 
 ```sh
 # Enable "repos-only" mode. Note, the default is false.
@@ -207,8 +228,8 @@ history stack.
 
 By default, the history stack can contain duplicate directories. To follow the
 `pushd` behavior from shells that enable duplicate suppression, set
-`CDC_IGNORE_DUPS` to `true`. When enabled, pushing a directory that is already in
-the stack moves it to the current position instead of adding a duplicate.
+`CDC_IGNORE_DUPS` to `true`. When enabled, pushing a directory that is already
+in the stack moves it to the current position instead of adding a duplicate.
 
 ```sh
 # Move repeated directories to the current position instead of duplicating them.
@@ -295,7 +316,7 @@ directory history stack, similar to `pushd`, `popd`, and `dirs`. Others are for
 overriding variables set in a shell config file. There's also a verbose mode.
 Options that change a directory lookup can be combined, such as `-aRw` or
 `-PU`. Standalone action options (`-G`, `-l`, `-L`, `-i`, `-d`, `-n`, `-t`,
-`-p`, `-X`, and `-h`) should be used one at a time, without a directory
+`-p`, `-X`, `-e`, and `-h`) should be used one at a time, without a directory
 argument.
 The `-x` history action is also standalone, but requires one directory operand
 to delete matching entries from the history stack.
@@ -305,6 +326,8 @@ to delete matching entries from the history stack.
 |-a|Allow the plugin to `cd` to ignored directories.|
 |-c|Enable colored output.|
 |-C|Disable colored output.|
+|-e|Edit cached collision choices.|
+|-s|Choose a matching directory again, with an optional prompt to save the preference.|
 |-G|Audit Git repositories in `CDC_DIRS` for local work or unpushed commits.|
 |-H|Include hidden directories in lookup, listing, and completion.|
 |-l|List all directories to which you can `cdc`. Same as tab-completion.|
@@ -327,7 +350,9 @@ to delete matching entries from the history stack.
 |-h|Print help.|
 
 ## Tests
-The test suite uses [bats-core](https://github.com/bats-core/bats-core). Tests
+The test suite requires [bats-core](https://github.com/bats-core/bats-core),
+bash, and zsh. Python 3 is optional: real-terminal tests are skipped when it
+is unavailable; CI runs them with Python 3 installed. Tests
 create their own temporary fixtures and shell configuration.
 
 ```sh

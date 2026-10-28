@@ -16,11 +16,15 @@ if [[ -n ${BASH_IT:-} ]] \
     && declare -F cite >/dev/null \
     && declare -F about-plugin >/dev/null; then
     cite about-plugin
+    # The citation intentionally displays literal shell syntax.
+    # shellcheck disable=SC2016
     about-plugin '`cd` to directories from anywhere without changing $CDPATH'
 fi
 
 ##
 # Add completion arguments.
+#
+# @return void
 _cdc_complete() {
     local cur
     local mode
@@ -71,12 +75,14 @@ _cdc_complete() {
 
     if [[ $cur == -* ]]; then
         # compgen filters a word list to values matching the current word.
+        # Options are fixed single-word flags; splitting compgen output is safe.
+        # shellcheck disable=SC2207
         COMPREPLY=( $( compgen -W "$(_cdc_completion_terminal_options) $(_cdc_completion_history_options) $(_cdc_completion_directory_options)" -- "$cur" ) )
         return 0
     fi
 
     # _cdc_completion_mode prints four whitespace-separated booleans.
-    mode=($(_cdc_completion_mode "${args[@]}"))
+    read -r -a mode <<< "$(_cdc_completion_mode "${args[@]}")"
     allow_ignored="${mode[0]}"
     repos_only="${mode[1]}"
     parent_dirs="${mode[2]}"

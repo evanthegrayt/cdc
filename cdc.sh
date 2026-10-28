@@ -9,6 +9,10 @@ cdc() {
     ##
     # Set local vars to avoid environment pollution.
     local wdir
+    local cdc_choose_interactive=false
+    [[ -t 0 && -t 1 ]] && cdc_choose_interactive=true
+    local cdc_edit_choices=false
+    local cdc_select=false
     local cdc_current_root
     local rc=0
     local cdc_list_dirs=false
@@ -55,10 +59,25 @@ cdc() {
     ##
     # Parse short options. getopts errors are suppressed so unsupported flags
     # can use cdc's own error text instead of shell-generated messages.
-    while getopts 'acCdDGhiHlLnNPprRtuUvwxX' opt 2>/dev/null; do
+    while getopts 'acCdDeGhiHlLnNPprRstuUvwxX' opt 2>/dev/null; do
         case $opt in
 
             ##
+            # -s: Select a match again, optionally replacing the preference.
+            s)
+                cdc_select=true
+                has_directory_modifier=true
+                cdc_git_audit_disallowed_modifier=true
+                (( directory_modifier_count += 1 ))
+                ;;
+
+            ##
+            # -e: Edit cached collision preferences.
+            e)
+                cdc_edit_choices=true
+                (( terminal_action_count += 1 ))
+                ;;
+
             # -a: Allow cd-ing to ignored directories.
             a)
                 allow_ignored=true
@@ -231,7 +250,7 @@ cdc() {
             ##
             # If the option isn't supported, tell the user and exit.
             *)
-                _cdc_print 'error' 'Invalid option.' $verbose
+                _cdc_print 'error' 'Invalid option.' "$verbose"
                 return 1
                 ;;
         esac
@@ -252,7 +271,7 @@ cdc() {
     fi
 
     ##
-    if [[ $verbose == true ]]; then
+    if [[ "$verbose" == true ]]; then
         _cdc_print_verbose_env
     fi
 
@@ -260,7 +279,7 @@ cdc() {
     # Standalone actions (-l, -d, -p, etc.) do not accept directory operands or
     # directory modifiers because they complete the whole command by themselves.
     if (( terminal_action_count > 1 )); then
-        _cdc_print 'error' 'Use only one standalone option at a time.' $verbose
+        _cdc_print 'error' 'Use only one standalone option at a time.' "$verbose"
         return 1
     fi
 
@@ -274,7 +293,7 @@ cdc() {
                 || $cdc_pop == true ]]; then
             :
         else
-            _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
+            _cdc_print 'error' 'Standalone options cannot be combined with directory options.' "$verbose"
             return 1
         fi
     fi
@@ -283,7 +302,7 @@ cdc() {
         && [[ $has_directory_modifier == true ]] \
         && [[ $cdc_git_audit == true ]] \
         && [[ $cdc_git_audit_disallowed_modifier == true ]]; then
-        _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
+        _cdc_print 'error' 'Standalone options cannot be combined with directory options.' "$verbose"
         return 1
     fi
 
@@ -291,20 +310,20 @@ cdc() {
         if [[ $cdc_show_history != true \
             && $cdc_current != true \
             && $cdc_pop != true ]]; then
-            _cdc_print 'error' 'Standalone options cannot be combined with directory options.' $verbose
+            _cdc_print 'error' 'Standalone options cannot be combined with directory options.' "$verbose"
             return 1
         fi
     fi
 
     if [[ $cdc_delete_history == true ]]; then
         if (( $# != 1 )); then
-            _cdc_print 'error' 'History delete requires a directory.' $verbose
-            _cdc_print 'error' '  Use `-h` for more help' $verbose
+            _cdc_print 'error' 'History delete requires a directory.' "$verbose"
+            _cdc_print 'error' "  Use \`-h\` for more help" "$verbose"
             return 1
         fi
     elif (( terminal_action_count == 1 )) && (( $# != 0 )); then
-        _cdc_print 'error' 'Standalone options do not accept a directory.' $verbose
-        _cdc_print 'error' '  Use `-h` for more help' $verbose
+        _cdc_print 'error' 'Standalone options do not accept a directory.' "$verbose"
+        _cdc_print 'error' "  Use \`-h\` for more help" "$verbose"
         return 1
     fi
 
@@ -313,18 +332,23 @@ cdc() {
         return 0
     fi
 
+    if [[ $cdc_edit_choices == true ]]; then
+        _cdc_edit_choices
+        return $?
+    fi
+
     ##
     # Check for the required variables that should be exported from a shell
     # config file. If not found, exit with a non-zero return code.
     if [[ $cdc_git_audit == true && -z $CDC_DIRS ]]; then
         _cdc_print 'error' \
             'You must set CDC_DIRS in a config file' \
-            $verbose
+            "$verbose"
         return 1
     elif [[ -z $CDC_DIRS && -z $CDC_EXPLICIT_DIRS ]]; then
         _cdc_print 'error' \
             'You must set CDC_DIRS or CDC_EXPLICIT_DIRS in a config file' \
-            $verbose
+            "$verbose"
         return 1
     fi
 
@@ -391,8 +415,8 @@ cdc() {
     ##
     # Print usage and exit if the wrong number of arguments are passed.
     if (( $# != 1 )); then
-        _cdc_print 'error' 'USAGE: cdc [OPTION] [DIRECTORY]' $verbose
-        _cdc_print 'error' '  Use `-h` for more help' $verbose
+        _cdc_print 'error' 'USAGE: cdc [OPTION] [DIRECTORY]' "$verbose"
+        _cdc_print 'error' "  Use \`-h\` for more help" "$verbose"
         return 1
     fi
 
@@ -420,13 +444,16 @@ cdc() {
     # Resolve either a configured parent directory (-P) or a child directory
     # found beneath one of the configured parents.
     if [[ $cdc_parent_dirs == true ]]; then
-        wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" "$verbose")
+        wdir=$(_cdc_find_parent_dir "$cd_dir" "$allow_ignored" "$verbose") || rc=$?
     else
         wdir=$(_cdc_find_dir \
-            "$cd_dir" "$allow_ignored" "$repos_only" "$verbose" "$allow_hidden")
+            "$cd_dir" "$allow_ignored" "$repos_only" "$verbose" "$allow_hidden") || rc=$?
     fi
 
-    if (( $? == 0 )); then
+    # Cancellation is distinct from a missing directory and leaves state alone.
+    (( rc == 130 )) && return 130
+
+    if (( rc == 0 )); then
         cdc_current_root="$wdir"
 
         ##
@@ -460,7 +487,7 @@ cdc() {
     ##
     # If no directory was found, print a message to stderr and return an
     # unsuccessful code.
-    _cdc_print 'error' "[$cd_dir] not found." $verbose
+    _cdc_print 'error' "[$cd_dir] not found." "$verbose"
 
     return 2
 }
@@ -518,7 +545,7 @@ _cdc_history_delete() {
     local -a cdc_new_history=()
 
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' 'Stack is empty.' $verbose
+        _cdc_print 'error' 'Stack is empty.' "$verbose"
         return 1
     fi
 
@@ -534,12 +561,12 @@ _cdc_history_delete() {
     done
 
     if [[ $cdc_deleted != true ]]; then
-        _cdc_print 'error' "[$dir] not found in history." $verbose
+        _cdc_print 'error' "[$dir] not found in history." "$verbose"
         return 1
     fi
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Deleting directories from history.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Deleting directories from history.' "$verbose"
     fi
 
     CDC_HISTORY=("${cdc_new_history[@]}")
@@ -553,8 +580,8 @@ _cdc_history_delete() {
 _cdc_history_clear() {
     local verbose="$1"
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Clearing history.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Clearing history.' "$verbose"
     fi
 
     CDC_HISTORY=()
@@ -666,16 +693,17 @@ _cdc_print_verbose_env() {
             "$error_prefix" "$cdc_ignore" "$reset_prefix"
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
     echo
+    printf "CDC_COLLISION_MODE = %s\n" "${CDC_COLLISION_MODE:-first}"
     printf "CDC_AUTO_PUSH     = %s\n" \
-        $( _cdc_print 'boolean' $CDC_AUTO_PUSH )
+        "$( _cdc_print 'boolean' "$CDC_AUTO_PUSH" )"
     printf "CDC_IGNORE_DUPS   = %s\n" \
-        $( _cdc_print 'boolean' $CDC_IGNORE_DUPS )
+        "$( _cdc_print 'boolean' "$CDC_IGNORE_DUPS" )"
     printf "CDC_REPOS_ONLY    = %s\n" \
-        $( _cdc_print 'boolean' $CDC_REPOS_ONLY )
+        "$( _cdc_print 'boolean' "$CDC_REPOS_ONLY" )"
     printf "CDC_ALLOW_HIDDEN  = %s\n" \
-        $( _cdc_print 'boolean' $CDC_ALLOW_HIDDEN )
+        "$( _cdc_print 'boolean' "$CDC_ALLOW_HIDDEN" )"
     printf "CDC_COLOR         = %s\n" \
-        $( _cdc_print 'boolean' $CDC_COLOR )
+        "$( _cdc_print 'boolean' "$CDC_COLOR" )"
     echo
     printf "CDC_SUCCESS_COLOR = %b%s%b\n" \
         "$success_prefix" "$success_color" "$reset_prefix"
@@ -697,6 +725,8 @@ _cdc_option_specs() {
     printf "%s\t%s\t%s\n" 'a' 'directory' 'cd to the directory even if it is ignored'
     printf "%s\t%s\t%s\n" 'c' 'directory' 'Enable colored output'
     printf "%s\t%s\t%s\n" 'C' 'directory' 'Disable colored output'
+    printf "%s\t%s\t%s\n" 's' 'directory' 'Select a matching directory again, optionally saving the choice'
+    printf "%s\t%s\t%s\n" 'e' 'terminal' 'Edit cached collision choices'
     printf "%s\t%s\t%s\n" 'G' 'terminal' 'Audit git repositories for local work or unpushed commits'
     printf "%s\t%s\t%s\n" 'H' 'directory' 'Include hidden directories in lookup, listing, and completion'
     printf "%s\t%s\t%s\n" 'l' 'terminal' 'List cdc-able directories'
@@ -725,7 +755,7 @@ _cdc_option_specs() {
 # @return void
 _cdc_print_help() {
     local opt
-    local kind
+    local _kind
     local description
     local success_prefix
     local warning_prefix
@@ -743,7 +773,7 @@ _cdc_print_help() {
     printf 'Flags will always override options set in shell config files!'
     printf "%b\n" "$reset_prefix"
 
-    while IFS=$'\t' read -r opt kind description; do
+    while IFS=$'\t' read -r opt _kind description; do
         printf "  %b-%s%b" "$warning_prefix" "$opt" "$reset_prefix"
         printf " | %s\n" "$description"
     done < <(_cdc_option_specs)
@@ -757,8 +787,8 @@ _cdc_print_help() {
 _cdc_list_searched_dirs() {
     local verbose="$1"
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Listing searched directories.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Listing searched directories.' "$verbose"
     fi
 
     _cdc_parse_colon_string "$CDC_DIRS" | column
@@ -775,8 +805,8 @@ _cdc_list_available_dirs() {
     local allow_hidden="${2:-${CDC_ALLOW_HIDDEN:-false}}"
     local list
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Listing available directories.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Listing available directories.' "$verbose"
     fi
 
     ##
@@ -814,7 +844,7 @@ _cdc_git_audit() {
         [[ -n $parent_dir ]] || continue
 
         if ! [[ -d $parent_dir ]]; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
                     "$parent_dir is in CDC_DIRS but isn't a directory." \
                     "$verbose"
@@ -950,7 +980,7 @@ _cdc_git_audit_ahead_count() {
     local dir="$1"
     local verbose="${2:-false}"
     local counts
-    local behind
+    local _behind
     local ahead
 
     if ! git -C "$dir" rev-parse --abbrev-ref --symbolic-full-name \
@@ -965,7 +995,7 @@ _cdc_git_audit_ahead_count() {
         return 2
     fi
 
-    read -r behind ahead <<< "$counts"
+    read -r _behind ahead <<< "$counts"
     printf "%s\n" "${ahead:-0}"
 }
 
@@ -986,12 +1016,12 @@ _cdc_list_ignored_dirs() {
     done < <(_cdc_parse_colon_string "$CDC_IGNORE")
 
     if (( cdc_ignore_count == 0 )); then
-        if [[ $verbose == true ]]; then
-            _cdc_print 'warn' 'No directories are being ignored.' $verbose
+        if [[ "$verbose" == true ]]; then
+            _cdc_print 'warn' 'No directories are being ignored.' "$verbose"
         fi
     else
-        if [[ $verbose == true ]]; then
-            _cdc_print 'success' 'Listing ignored directories.' $verbose
+        if [[ "$verbose" == true ]]; then
+            _cdc_print 'success' 'Listing ignored directories.' "$verbose"
         fi
 
         _cdc_parse_colon_string "$CDC_IGNORE" | column
@@ -1013,12 +1043,12 @@ _cdc_history_toggle() {
     ##
     # If the stack doesn't have at least two elements, tell the user.
     if (( ${#CDC_HISTORY[@]} < 2 )); then
-        _cdc_print 'error' 'Not enough directories in the stack.' $verbose
+        _cdc_print 'error' 'Not enough directories in the stack.' "$verbose"
         return 1
     fi
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Toggling between last two directories.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Toggling between last two directories.' "$verbose"
     fi
 
     ##
@@ -1055,18 +1085,18 @@ _cdc_history_list() {
     ##
     # If the stack is empty, tell the user.
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' 'Stack is empty.' $verbose
+        _cdc_print 'error' 'Stack is empty.' "$verbose"
         return 1
     fi
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Listing directories in history.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Listing directories in history.' "$verbose"
     fi
 
     ##
     # Print the array.
     for cdc_history in "${CDC_HISTORY[@]}"; do
-        if [[ $verbose == true || $which == true ]]; then
+        if [[ "$verbose" == true || $which == true ]]; then
             printf "%s " "$cdc_history"
         else
             printf "%s " "${cdc_history##*/}"
@@ -1089,12 +1119,12 @@ _cdc_history_current() {
     ##
     # If the stack is empty, tell the user.
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' "Stack is empty." $verbose
+        _cdc_print 'error' "Stack is empty." "$verbose"
         return 1
     fi
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Changing to current directory in history.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Changing to current directory in history.' "$verbose"
     fi
 
     ##
@@ -1124,15 +1154,15 @@ _cdc_history_pop() {
     ##
     # If there aren't enough directories to pop, notify the user.
     if (( ${#CDC_HISTORY[@]} == 0 )); then
-        _cdc_print 'error' 'Stack is empty.' $verbose
+        _cdc_print 'error' 'Stack is empty.' "$verbose"
         return 1
     elif (( ${#CDC_HISTORY[@]} == 1 )); then
-        _cdc_print 'error' 'At beginning of stack.' $verbose
+        _cdc_print 'error' 'At beginning of stack.' "$verbose"
         return 1
     fi
 
-    if [[ $verbose == true ]]; then
-        _cdc_print 'success' 'Changing to last directory in history.' $verbose
+    if [[ "$verbose" == true ]]; then
+        _cdc_print 'success' 'Changing to last directory in history.' "$verbose"
     fi
 
     cdc_last_index=$(_cdc_array_next_to_last_index "${#CDC_HISTORY[@]}")
@@ -1233,6 +1263,8 @@ _cdc_find_dir() {
     local dir
     local dir_path
 
+    local -a matches=()
+
     _cdc_find_explicit_dir "$cd_dir" "$verbose" && return 0
 
     ##
@@ -1243,9 +1275,9 @@ _cdc_find_dir() {
         # If a path is in CDC_DIRS but doesn't exist, print a message to stderr
         # and move on to the next configured path.
         if ! [[ -d $dir ]]; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
-                    "$dir is in CDC_DIRS but isn't a directory." $verbose
+                    "$dir is in CDC_DIRS but isn't a directory." "$verbose"
             fi
             continue
         fi
@@ -1260,18 +1292,18 @@ _cdc_find_dir() {
         # If the directory exists, but is excluded, skip it.
         elif [[ $allow_ignored == false ]] \
             && _cdc_is_excluded_dir "$dir_path/$cd_dir"; then
-            if [[ $verbose == true ]]; then
-                _cdc_print 'warn' 'Match was found but it is ignored.' $verbose
+            if [[ "$verbose" == true ]]; then
+                _cdc_print 'warn' 'Match was found but it is ignored.' "$verbose"
             fi
             continue
 
         ##
         # If the directory exists, but is hidden, skip it unless allowed.
         elif [[ $allow_hidden == false ]] && _cdc_is_hidden_dir "$cd_dir"; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
                     'Match was found but hidden directories are not allowed.' \
-                    $verbose
+                    "$verbose"
             fi
             continue
 
@@ -1280,21 +1312,20 @@ _cdc_find_dir() {
         # directory isn't a repo, skip it.
         elif [[ $repos_only == true ]] \
             && ! _cdc_is_repo_dir "$dir_path/$cd_dir"; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
-                    'Match was found but it is not a repository.' $verbose
+                    'Match was found but it is not a repository.' "$verbose"
             fi
             continue
         fi
 
         ##
         # By this point, the match exists and passed ignore/hidden/repo checks,
-        # so print the absolute path for the caller.
-        echo "$dir_path/$cd_dir"
-        return 0
+        # so collect it before applying the collision preference.
+        matches+=("$dir_path/$cd_dir")
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
 
-    return 2
+    _cdc_choose_match repo "$cd_dir" "${matches[@]}"
 }
 
 ##
@@ -1314,10 +1345,10 @@ _cdc_find_explicit_dir() {
         [[ -n $dir ]] || continue
 
         if ! [[ -d $dir ]]; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
                     "$dir is in CDC_EXPLICIT_DIRS but isn't a directory." \
-                    $verbose
+                    "$verbose"
             fi
             continue
         fi
@@ -1347,15 +1378,16 @@ _cdc_find_parent_dir() {
     local verbose="$3"
     local dir
     local dir_path
+    local -a matches=()
     local parent_dir
 
     while IFS= read -r dir; do
         [[ -n $dir ]] || continue
 
         if ! [[ -d $dir ]]; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
-                    "$dir is in CDC_DIRS but isn't a directory." $verbose
+                    "$dir is in CDC_DIRS but isn't a directory." "$verbose"
             fi
             continue
         fi
@@ -1369,17 +1401,16 @@ _cdc_find_parent_dir() {
         if [[ $parent_dir != "$cd_dir" ]]; then
             continue
         elif [[ $allow_ignored == false ]] && _cdc_is_excluded_dir "$dir_path"; then
-            if [[ $verbose == true ]]; then
-                _cdc_print 'warn' 'Match was found but it is ignored.' $verbose
+            if [[ "$verbose" == true ]]; then
+                _cdc_print 'warn' 'Match was found but it is ignored.' "$verbose"
             fi
             continue
         fi
 
-        echo "$dir"
-        return 0
+        matches+=("$dir_path")
     done < <(_cdc_parse_colon_string "$CDC_DIRS")
 
-    return 2
+    _cdc_choose_match parent "$cd_dir" "${matches[@]}"
 }
 
 ##
@@ -1409,10 +1440,10 @@ _cdc_resolve_subdir() {
         if [[ -d $wdir/$subdir ]] \
             && [[ $allow_hidden == false ]] \
             && _cdc_path_contains_hidden_dir "$subdir"; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
                     'Match was found but hidden directories are not allowed.' \
-                    $verbose
+                    "$verbose"
             fi
         ##
         # If it exists as an allowed directory, append it to the path.
@@ -1422,8 +1453,8 @@ _cdc_resolve_subdir() {
 
             ##
             # If it doesn't exist as a directory, print message to stderr.
-            if [[ $verbose == true ]]; then
-                _cdc_print 'warn' "$subdir does not exist in $cd_dir." $verbose
+            if [[ "$verbose" == true ]]; then
+                _cdc_print 'warn' "$subdir does not exist in $cd_dir." "$verbose"
             fi
         fi
     fi
@@ -1533,10 +1564,10 @@ _cdc_repo_list() {
         [[ -n $dir ]] || continue
 
         if ! [[ -d $dir ]]; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
                     "$dir is in CDC_EXPLICIT_DIRS but isn't a directory." \
-                    $verbose
+                    "$verbose"
             fi
             continue
         fi
@@ -1552,7 +1583,7 @@ _cdc_repo_list() {
         ##
         # If the element isn't a directory that exists, move on.
         if ! [[ -d $dir ]]; then
-            if [[ $verbose == true ]]; then
+            if [[ "$verbose" == true ]]; then
                 _cdc_print 'warn' \
                     "$dir is in CDC_DIRS but isn't a directory."
             fi
@@ -1601,8 +1632,10 @@ _cdc_is_repo_dir() {
     local repo_markers
 
     if [[ -n $CDC_REPO_MARKERS ]]; then
-        local IFS=$'\n'
-        repo_markers=($( _cdc_parse_colon_string "$CDC_REPO_MARKERS" ))
+        repo_markers=()
+        while IFS= read -r marker; do
+            repo_markers+=("$marker")
+        done < <(_cdc_parse_colon_string "$CDC_REPO_MARKERS")
     else
         repo_markers=(.git/ .git Rakefile Makefile .hg/ .bzr/ .svn/)
     fi
@@ -1630,7 +1663,6 @@ _cdc_is_repo_dir() {
 
 ##
 # Print a message with colored output.
-# TODO This function can definitely be DRY-ed up.
 #
 # @param string $level
 # @param string $message
@@ -1654,7 +1686,7 @@ _cdc_print() {
 
     ##
     # If verbose output is disabled, just print the message and return.
-    if [[ $verbose == false ]]; then
+    if [[ "$verbose" == false ]]; then
         printf "%s\n" "$message"
         return
     fi
@@ -1688,7 +1720,234 @@ _cdc_print() {
     esac
 }
 
+
 ##
+# Print the configured choices cache path.
+#
+# @return string
+_cdc_choices_file() {
+    printf '%s\n' "${CDC_CHOICES_FILE:-${XDG_CACHE_HOME:-$HOME/.cache}/cdc/choices}"
+}
+
 ##
-# Set the array that will remember the history. Needs to persist.
+# Create and open the choices cache in the preferred editor.
+#
+# @return boolean
+_cdc_edit_choices() {
+    local file
+    local editor="${VISUAL:-${EDITOR:-vi}}"
+    local -a editor_args
+    file=$(_cdc_choices_file)
+    mkdir -p -- "$(dirname -- "$file")" && touch -- "$file" || return 1
+    # Support editor commands with arguments in both bash and zsh.
+    if [[ -n $ZSH_VERSION ]]; then
+        # zsh requires its explicit word-splitting flag for editor arguments.
+        # shellcheck disable=SC2206
+        editor_args=( ${=editor} )
+    else
+        read -r -a editor_args <<< "$editor"
+    fi
+    "${editor_args[@]}" "$file"
+}
+
+##
+# Replace one preference while preserving records for other names and modes.
+# Edited contents are treated as data and are never evaluated.
+#
+# @param string $mode
+# @param string $name
+# @param string $selected
+# @return boolean
+_cdc_save_choice() {
+    local mode="$1" name="$2" selected="$3"
+    local file tmp line record_mode record_name rest
+    file=$(_cdc_choices_file)
+    mkdir -p -- "$(dirname -- "$file")" || return 1
+    # Write beside the cache so the final rename replaces it atomically.
+    tmp=$(mktemp "${file}.XXXXXX") || return 1
+    if [[ -f $file ]]; then
+        while IFS= read -r line || [[ -n $line ]]; do
+            # Peel off the two key fields without interpreting path contents.
+            record_mode=${line%%$'\t'*}
+            rest=${line#*$'\t'}
+            record_name=${rest%%$'\t'*}
+            [[ $record_mode == "$mode" && $record_name == "$name" ]] && continue
+            printf '%s\n' "$line"
+        done < "$file" > "$tmp"
+    fi
+    if printf '%s\t%s\t%s\n' "$mode" "$name" "$selected" >> "$tmp" \
+        && mv -- "$tmp" "$file"; then
+        return 0
+    fi
+    rm -f -- "$tmp"
+    return 1
+}
+
+##
+# Print a saved preference only when it is still a valid lookup candidate.
+#
+# @param string $mode
+# @param string $name
+# @param string[] $matches
+# @return string
+_cdc_cached_choice() {
+    local mode="$1" name="$2"
+    shift 2
+    local file record_mode record_name cached candidate
+    file=$(_cdc_choices_file)
+    # Membership in the freshly filtered matches validates all lookup rules.
+    if [[ -f $file ]]; then
+        while IFS=$'\t' read -r record_mode record_name cached \
+            || [[ -n $record_mode ]]; do
+            [[ $record_mode == "$mode" && $record_name == "$name" ]] || continue
+            for candidate in "$@"; do
+                if [[ $cached == "$candidate" && -d $cached ]]; then
+                    printf '%s\n' "$cached"
+                    return 0
+                fi
+            done
+        done < "$file"
+    fi
+    return 1
+}
+
+##
+# Prompt for a numbered candidate and print the selected path.
+# Return status 130 on end-of-input, without changing shell state or the cache.
+#
+# @param string $name
+# @param string[] $matches
+# @return string
+_cdc_prompt_choice() {
+    local name="$1"
+    shift
+    local candidate answer selected
+    local count=0 index=0
+    printf 'Multiple matches for %s:\n' "$name" >&2
+    for candidate in "$@"; do
+        (( count += 1 ))
+        printf '  %s) %s\n' "$count" "$candidate" >&2
+    done
+    while true; do
+        printf 'Choose a directory [1-%s]: ' "$count" >&2
+        if ! IFS= read -r answer; then
+            printf '\ncdc: Selection canceled.\n' >&2
+            return 130
+        fi
+        # Compare against generated numbers, avoiding arithmetic on user input
+        # and differences between bash and zsh array indexing.
+        index=0
+        for candidate in "$@"; do
+            (( index += 1 ))
+            if [[ $answer == "$index" ]]; then
+                selected="$candidate"
+                break
+            fi
+        done
+        [[ -n $selected ]] && break
+        printf 'Enter a number from 1 to %s.\n' "$count" >&2
+    done
+    printf '%s\n' "$selected"
+}
+
+##
+# Ask whether a forced selection should replace the saved preference.
+# Empty input or end-of-input declines saving but still permits navigation.
+#
+# @param string $name
+# @return boolean
+_cdc_confirm_save_choice() {
+    local name="$1"
+    local answer
+    while true; do
+        printf 'Save this as your default for "%s"? [y/N] ' "$name" >&2
+        if ! IFS= read -r answer; then
+            printf '\n' >&2
+            return 1
+        fi
+        case "$answer" in
+            y|Y|yes|Yes|YES) return 0 ;;
+            ''|n|N|no|No|NO) return 1 ;;
+            *) printf 'Enter y or n.\n' >&2 ;;
+        esac
+    done
+}
+
+##
+# Resolve a collision according to CDC_COLLISION_MODE and the -s override.
+# Only cdc enables interactive choices, before capturing resolver stdout.
+#
+# @param string $mode
+# @param string $name
+# @param string[] $matches
+# @return string
+_cdc_choose_match() {
+    local mode="$1" name="$2"
+    shift 2
+    (( $# > 0 )) || return 2
+    local candidate existing selected duplicate
+    local cached=
+    local collision_mode="${CDC_COLLISION_MODE:-first}"
+    local save_choice=false
+    case "$collision_mode" in
+        first|cache|prompt) ;;
+        *)
+            printf 'cdc: Invalid CDC_COLLISION_MODE "%s"; using first.\n' \
+                "$collision_mode" >&2
+            collision_mode=first
+            ;;
+    esac
+    local -a matches=()
+    # Repeated CDC_DIRS entries should not create a collision by themselves.
+    for candidate in "$@"; do
+        duplicate=false
+        for existing in "${matches[@]}"; do
+            [[ $candidate == "$existing" ]] && duplicate=true
+        done
+        [[ $duplicate == true ]] || matches+=("$candidate")
+    done
+    if [[ ${#matches[@]} -eq 1 ]] \
+        || [[ $collision_mode == first && ${cdc_select:-false} != true ]] \
+        || [[ ${cdc_choose_interactive:-false} != true \
+            && ${cdc_read_choices:-false} != true ]]; then
+        for candidate in "${matches[@]}"; do
+            printf '%s\n' "$candidate"
+            return 0
+        done
+    fi
+    # Only cache mode reads preferences, including during forced selection.
+    if [[ $collision_mode == cache ]]; then
+        cached=$(_cdc_cached_choice "$mode" "$name" "${matches[@]}") || cached=
+    fi
+    if [[ -n $cached && ${cdc_select:-false} != true ]]; then
+        printf '%s\n' "$cached"
+        return 0
+    fi
+    # Only cache mode reuses preferences during completion; other modes use
+    # the first match, and no completion mode may prompt or write.
+    if [[ ${cdc_choose_interactive:-false} != true ]]; then
+        for candidate in "${matches[@]}"; do
+            printf '%s\n' "$candidate"
+            return 0
+        done
+    fi
+    selected=$(_cdc_prompt_choice "$name" "${matches[@]}") || return $?
+    # Outside cache mode all selections are temporary. In cache mode, -s asks
+    # before replacing a preference; choosing the existing default needs no write.
+    if [[ $collision_mode == cache ]]; then
+        if [[ ${cdc_select:-false} != true ]]; then
+            save_choice=true
+        elif [[ $selected != "$cached" ]] && _cdc_confirm_save_choice "$name"; then
+            save_choice=true
+        fi
+    fi
+    if [[ $save_choice == true ]]; then
+        _cdc_save_choice "$mode" "$name" "$selected" \
+            || printf 'cdc: Unable to save collision choice.\n' >&2
+    fi
+    printf '%s\n' "$selected"
+}
+
+##
+# Initialize the session history shared by cdc calls.
 CDC_HISTORY=()
