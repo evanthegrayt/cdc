@@ -316,6 +316,8 @@ _cdc_completion_history_list() {
     local cdc_seen
     local -a cdc_history_basenames=()
 
+    # CDC_HISTORY is initialized by the sourced cdc.sh.
+    # shellcheck disable=SC2153
     for cdc_history in "${CDC_HISTORY[@]}"; do
         cdc_history_basename="${cdc_history##*/}"
         cdc_seen=false
@@ -536,6 +538,15 @@ _cdc_completion_subdir_list() {
 # @param boolean $allow_hidden
 # @return string
 _cdc_completion_list() {
+    # Dynamic locals let the shared resolver read preferences without prompting,
+    # even if completion is invoked from a scope that enabled interactive lookup.
+    # shellcheck disable=SC2034
+    local cdc_read_choices=true
+    # Forced selection affects navigation only; completion follows the mode.
+    # shellcheck disable=SC2034
+    local cdc_select=false
+    # shellcheck disable=SC2034
+    local cdc_choose_interactive=false
     local current="$1"
     local allow_ignored="${2:-false}"
     local repos_only="${3:-${CDC_REPOS_ONLY:-false}}"
@@ -569,6 +580,8 @@ _cdc_completion_list() {
                 "$cd_dir" "$allow_ignored" "$repos_only" false "$allow_hidden")
         fi
 
+        # Preserve the status of whichever resolver branch ran above.
+        # shellcheck disable=SC2181
         (( $? == 0 )) || return 0
 
         _cdc_completion_subdir_list \

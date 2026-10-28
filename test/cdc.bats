@@ -1303,6 +1303,7 @@ setup() {
     assert_success
     assert_output_contains "-G"
     assert_output_contains "-v"
+    assert_output_contains "-s"
     assert_output_not_contains "-D"
 }
 
@@ -1312,7 +1313,7 @@ setup() {
     run bash -c '
         source "$CDC_PROJECT_ROOT/cdc.plugin.bash"
 
-        COMP_WORDS=(cdc -p "")
+        COMP_WORDS=(cdc -e "")
         COMP_CWORD=2
         _cdc_complete
         printf "%s\n" "${COMPREPLY[@]}"
@@ -1726,7 +1727,7 @@ setup() {
 
         source "$CDC_PROJECT_ROOT/cdc.plugin.zsh"
 
-        words=(cdc -p "")
+        words=(cdc -e "")
         CURRENT=3
         _cdc
     '
@@ -1813,6 +1814,7 @@ setup() {
     assert_success
     assert_output_contains "-G  Audit git repositories for local work or unpushed commits"
     assert_output_contains "-H  Include hidden directories in lookup, listing, and completion"
+    assert_output_contains "-s  Select a matching directory again, optionally saving the choice"
     assert_output_contains "-P  cd to a configured parent directory"
     assert_output_contains "-R  cd to any directory, even if it is not a repository"
     assert_output_contains "-p  cd to the previous directory and pop it from the stack"
@@ -1898,4 +1900,146 @@ setup() {
     '
 
     assert_success
+}
+
+@test "noninteractive collisions ignore preferences and never create choices" {
+    run cdc -w repo
+    assert_success
+    [ "$output" = "$CDC_FIXTURE/one/repo" ]
+    [ ! -e "$CDC_CHOICES_FILE" ]
+    mkdir -p "$(dirname "$CDC_CHOICES_FILE")"
+    printf 'repo\trepo\t%s\n' "$CDC_FIXTURE/two/repo" > "$CDC_CHOICES_FILE"
+    run cdc -w repo
+    [ "$output" = "$CDC_FIXTURE/one/repo" ]
+}
+
+@test "edit creates choices without requiring directory configuration" {
+    unset CDC_DIRS CDC_EXPLICIT_DIRS VISUAL
+    export EDITOR="printf %s"
+    run cdc -e
+    assert_success
+    [ "$output" = "$CDC_CHOICES_FILE" ]
+    [ -f "$CDC_CHOICES_FILE" ]
+    run cdc -e repo
+    assert_failure_status 1
+    run cdc -eP
+    assert_failure_status 1
+}
+
+@test "terminal collision preferences work in bash and zsh" {
+    command -v python3 >/dev/null 2>&1 || skip "Python 3 is needed for real-terminal tests"
+    export CDC_PROJECT_ROOT CDC_FIXTURE
+    run python3 "$CDC_PROJECT_ROOT/test/interactive_choices.py"
+    assert_success
+}
+
+@test "noninteractive parent collisions use first match without a cache" {
+    mkdir -p "$CDC_FIXTURE/a/projects" "$CDC_FIXTURE/b/projects"
+    export CDC_DIRS="$CDC_FIXTURE/a/projects:$CDC_FIXTURE/b/projects"
+    run cdc -P -w projects
+    assert_success
+    [ "$output" = "$CDC_FIXTURE/a/projects" ]
+    [ ! -e "$CDC_CHOICES_FILE" ]
+}
+
+@test "choices file defaults to XDG cache and home fallback" {
+    unset CDC_CHOICES_FILE
+    export XDG_CACHE_HOME="$CDC_FIXTURE/xdg"
+    run _cdc_choices_file
+    [ "$output" = "$CDC_FIXTURE/xdg/cdc/choices" ]
+    unset XDG_CACHE_HOME
+    run _cdc_choices_file
+    [ "$output" = "$HOME/.cache/cdc/choices" ]
+}
+
+@test "collision edge cases preserve state and honor terminal checks" {
+    command -v python3 >/dev/null 2>&1 || skip "Python 3 is needed for real-terminal tests"
+    export CDC_PROJECT_ROOT CDC_FIXTURE
+    run python3 "$CDC_PROJECT_ROOT/test/choices_edge_cases.py"
+    assert_success
+}
+
+@test "completion honors cached repo and parent choices without changing cache" {
+    export CDC_COLLISION_MODE=cache
+    mkdir -p "$CDC_FIXTURE/two/repo/selected-only"
+    mkdir -p "$CDC_FIXTURE/a/parents/first" "$CDC_FIXTURE/b/parents/selected-parent"
+    mkdir -p "$(dirname "$CDC_CHOICES_FILE")"
+    printf 'repo\trepo\t%s\nparent\tparents\t%s' \
+        "$CDC_FIXTURE/two/repo" "$CDC_FIXTURE/b/parents" > "$CDC_CHOICES_FILE"
+    cp "$CDC_CHOICES_FILE" "$CDC_FIXTURE/original-choices"
+    export CDC_PROJECT_ROOT CDC_FIXTURE
+    local shell
+    for shell in bash zsh; do
+        run "$shell" -c '
+            source "$CDC_PROJECT_ROOT/cdc.sh"
+            source "$CDC_PROJECT_ROOT/cdc.completion.sh"
+            _cdc_completion_list repo/ false false false false
+            export CDC_DIRS="$CDC_FIXTURE/a/parents:$CDC_FIXTURE/b/parents"
+            _cdc_completion_list parents/ false false true false
+        '
+        assert_success
+        assert_output_contains 'repo/selected-only'
+        assert_output_contains 'parents/selected-parent'
+        assert_output_not_contains 'parents/first'
+    done
+    cmp "$CDC_CHOICES_FILE" "$CDC_FIXTURE/original-choices"
+}
+
+@test "select is a directory modifier in help and completion" {
+    run cdc -h
+    assert_success
+    assert_output_contains 'Select a matching directory again, optionally saving the choice'
+    run cdc -se
+    assert_failure_status 1
+    run cdc -sG
+    assert_failure_status 1
+    export CDC_PROJECT_ROOT
+    local shell
+    for shell in bash zsh; do
+        run "$shell" -c '
+            source "$CDC_PROJECT_ROOT/cdc.sh"
+            source "$CDC_PROJECT_ROOT/cdc.completion.sh"
+            _cdc_completion_directory_options
+            _cdc_completion_has_terminal_action -s && exit 1
+            _cdc_completion_list re false false false false
+        '
+        assert_success
+        assert_output_contains '-s'
+        assert_output_contains 'repo'
+    done
+}
+
+@test "completion uses saved choices only in cache collision mode" {
+    mkdir -p "$CDC_FIXTURE/one/repo/first-only" "$CDC_FIXTURE/two/repo/saved-only"
+    mkdir -p "$CDC_FIXTURE/a/parents/first-only" "$CDC_FIXTURE/b/parents/saved-only"
+    mkdir -p "$(dirname "$CDC_CHOICES_FILE")"
+    printf 'repo\trepo\t%s\nparent\tparents\t%s\n' \
+        "$CDC_FIXTURE/two/repo" "$CDC_FIXTURE/b/parents" > "$CDC_CHOICES_FILE"
+    cp "$CDC_CHOICES_FILE" "$CDC_FIXTURE/original-choices"
+    export CDC_PROJECT_ROOT CDC_FIXTURE
+    local shell policy
+    for shell in bash zsh; do
+        for policy in first cache prompt; do
+            export CDC_COLLISION_MODE="$policy"
+            run "$shell" -c '
+                source "$CDC_PROJECT_ROOT/cdc.sh"
+                source "$CDC_PROJECT_ROOT/cdc.completion.sh"
+                cdc_select=true
+                _cdc_completion_list repo/ false false false false
+                export CDC_DIRS="$CDC_FIXTURE/a/parents:$CDC_FIXTURE/b/parents"
+                _cdc_completion_list parents/ false false true false
+            '
+            assert_success
+            if [[ $policy == cache ]]; then
+                assert_output_contains 'repo/saved-only'
+                assert_output_contains 'parents/saved-only'
+                assert_output_not_contains 'first-only'
+            else
+                assert_output_contains 'repo/first-only'
+                assert_output_contains 'parents/first-only'
+                assert_output_not_contains 'saved-only'
+            fi
+        done
+    done
+    cmp "$CDC_CHOICES_FILE" "$CDC_FIXTURE/original-choices"
 }

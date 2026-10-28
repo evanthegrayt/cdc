@@ -16,7 +16,7 @@ jobs:
       - name: Install test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bats zsh
+          sudo apt-get install -y bats zsh python3
 
       - name: Run tests
         run: ./test/run.sh

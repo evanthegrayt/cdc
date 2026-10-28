@@ -18,6 +18,8 @@ fi
 
 ##
 # Add completion arguments.
+#
+# @return void
 _cdc_complete_options() {
   local -a options
   local -a descriptions
@@ -30,6 +32,10 @@ _cdc_complete_options() {
   compadd -d descriptions -- "${options[@]}"
 }
 
+##
+# Complete options, history entries, and directory operands in zsh.
+#
+# @return void
 _cdc() {
   local cur
   local i

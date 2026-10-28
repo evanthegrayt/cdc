@@ -9,4 +9,9 @@ if ! command -v bats >/dev/null 2>&1; then
     exit 127
 fi
 
+if ! command -v zsh >/dev/null 2>&1; then
+    echo "zsh is required to run the test suite." >&2
+    exit 127
+fi
+
 bats test
